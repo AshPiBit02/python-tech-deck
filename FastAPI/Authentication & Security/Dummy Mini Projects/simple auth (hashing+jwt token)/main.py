@@ -28,7 +28,7 @@ def get_me(x_token:str=Header(...)):
     payload=decode_access_token(x_token)
     if payload is None:
         raise HTTPException(status_code=401,detail="Invalid or expired token!")
-    return {"email":payload.get("email")}
+    return {"email":payload.get("sub")}
 
     
 
