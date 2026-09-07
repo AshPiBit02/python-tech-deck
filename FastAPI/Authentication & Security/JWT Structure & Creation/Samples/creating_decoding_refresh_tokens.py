@@ -1,5 +1,6 @@
 from jose import jwt,JWTError
 from datetime import timedelta,datetime,timezone
+import time
 
 SECRET_KEY="doss-ross-teli"
 ALOGORITHM="HS256"
@@ -11,7 +12,7 @@ def create_token(data:dict,expires_delts:timedelta,token_type=str)->str:
     return jwt.encode(to_encode,SECRET_KEY,algorithm=ALOGORITHM)
 
 def create_access_token(data:dict)->dict:
-    return create_token(data,timedelta(minutes=15),"access")
+    return create_token(data,timedelta(seconds=2),"access")
 
 def create_refresh_token(data:dict)->dict:
     return create_token(data,timedelta(days=7),"refresh")
@@ -36,7 +37,20 @@ def login(email:str)->dict:
 def call_protected_route(access_token:str)->str:
     payload=decode_token(access_token)
     if payload.get("type")!="access":
-        raise ValueError("Wrong token type fro this route")
+        raise ValueError("Wrong token type for this route")
     return f"Hello, {payload['sub']}! Access granted."
+
+def refresh_access_token(refresh_token:str)->str:
+    payload=decode_token(refresh_token)
+    if payload.get("type")!="refresh":
+        raise ValueError("Wrong token type for refresh")
+    return create_access_token({"sub":payload["sub"]})
+
+tokens=login("aegonVsnow@gmail.com")
+print(call_protected_route(tokens["access_token"]))
+time.sleep(3)
+
+new_access_token=refresh_access_token(tokens["refresh_token"])
+print(call_protected_route(new_access_token))
 
 
