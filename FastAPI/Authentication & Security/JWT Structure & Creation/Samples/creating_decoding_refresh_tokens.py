@@ -22,3 +22,21 @@ def decode_token(token:str)->dict:
     except JWTError:
         raise ValueError("Invalid or expired token")
 
+def get_current_user_from_access_token(token:str)->dict:
+    payload=decode_token(token)
+    if payload.get("type")!="access":
+        raise ValueError("This endpoint requires an access token, not a refresh token")
+    return payload
+
+def login(email:str)->dict:
+    access=create_access_token({"sub":email})
+    refresh=create_refresh_token({"sub":email})
+    return {"access_token":access,"refresh_token":refresh,"token_type":"brearer"}
+
+def call_protected_route(access_token:str)->str:
+    payload=decode_token(access_token)
+    if payload.get("type")!="access":
+        raise ValueError("Wrong token type fro this route")
+    return f"Hello, {payload['sub']}! Access granted."
+
+
