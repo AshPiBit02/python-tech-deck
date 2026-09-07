@@ -1,6 +1,6 @@
-from fastapi import FastAPI,APIRouter,Depends,HTTPException
+from fastapi import FastAPI,HTTPException,Header
 from database import USERS
-from auth import hash_password,verify_password,create_access_token
+from auth import hash_password,verify_password,create_access_token,decode_access_token
 
 app=FastAPI()
 
@@ -22,5 +22,13 @@ def login(email:str,password:str):
     
     access_token=create_access_token({"sub":email})
     return {"access_token":access_token,"token_type":"bearer"}
+
+@app.get("/me")
+def get_me(x_token:str=Header(...)):
+    payload=decode_access_token(x_token)
+    if payload is None:
+        raise HTTPException(status_code=401,detail="Invalid or expired token!")
+    return {"email":payload.get("email")}
+
     
 
