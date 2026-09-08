@@ -1,43 +1,149 @@
-# OAuth2 — From Basics to Production
+# Phase 6 — Authentication & Security: Basics
 
-Covers: what OAuth2 actually is, the Password flow used by FastAPI tutorials,
-`OAuth2PasswordBearer`/`OAuth2PasswordRequestForm` in depth, scopes, RBAC,
-and the gaps between a learning project and a production-ready system.
-
----
-
-## Part 1 — Basics
-
-### 1.1 What OAuth2 Actually Is
-
-OAuth2 is an **authorization framework** — a standardized specification describing how a client can obtain and use a token to act on behalf of a user, without the user's raw password being handled beyond the initial exchange. It is not a library and not FastAPI-specific — it is a spec implemented by many systems (Google login, GitHub login, a custom API).
-
-**Important distinction:** OAuth2 is technically about **authorization** (what an actor is allowed to do), but in practice — and in the login systems built earlier in this project — it is used as the mechanism for **authentication** (proving identity) too, since a valid access token implies identity was already proven to obtain it.
-
-### 1.2 Why FastAPI's OAuth2 Conventions Matter, Even for a Simple Login System
-
-A working login system can be built without any OAuth2-specific tooling — plain Pydantic bodies, `Header()`, JWT functions, exactly as done in the Simple Login API project. So the OAuth2-specific classes are not strictly required for functionality.
-
-**The reason to use them anyway: tooling compatibility.** `/docs` (Swagger UI) has a built-in "Authorize" button, a padlock icon on protected routes, and a login form — all of this only activates correctly when routes use FastAPI's OAuth2-flavored classes (`OAuth2PasswordBearer`, `OAuth2PasswordRequestForm`). A plain `Header()` approach works functionally, but loses that built-in UI convenience, and other tools/clients expecting standard OAuth2 shapes will not recognize a custom header pattern like `x-token`.
-
-### 1.3 OAuth2 "Flows" — Several Exist, Only One Is Relevant Here
-
-OAuth2 defines multiple **flows** (grant types) for different scenarios:
-
-| Flow | Used when |
-|---|---|
-| **Password** (Resource Owner Password Credentials) | The client is trusted and collects username/password directly — the pattern used in this project |
-| **Authorization Code** | Third-party login (e.g. "Sign in with Google") — the user is redirected to the provider, never gives the app their provider password directly |
-| **Client Credentials** | Machine-to-machine — no human user involved, a service authenticating as itself |
-| **Implicit** | Older, largely deprecated flow for browser-based apps — avoided in new work |
-
-**The Password flow is the appropriate choice here** — the client and the API are owned by the same project (a banking app's own login, not "log in with a third party"). The Authorization Code flow becomes relevant only if third-party login (Google/GitHub) is added later — a separate, more involved topic not covered in this document.
+Reference notes for JWT-based auth: password hashing, token structure, creation/
+verification, and the FastAPI-specific pieces that wire it all together.
 
 ---
 
-## Part 2 — `OAuth2PasswordBearer` in Depth
+## 1. The Two Questions Auth Answers
 
-### 2.1 What It Actually Does
+Keep these conceptually separate from the start — most confusion in this phase comes from blending them:
+
+- **Authentication** — "who are you?" — proving identity, typically via password
+- **Authorization** — "what are you allowed to do?" — permissions, once identity is known (e.g. admin vs. regular customer, RBAC in Phase 6.3)
+
+Everything in this file is about **authentication**. Authorization (role checks) builds on top of it later.
+
+---
+
+## 2. Why Existing `key_validation` Pattern Isn't Real Auth
+
+Across Enterprise, Wallet, and Banking projects, "secure" routes have used a single shared secret header:
+```python
+def key_validation(key: str = Header(...)):
+    if key != settings.secret_key:
+        raise HTTPException(status_code=403, detail="Invalid secret key!")
+```
+This proves **"you know a secret"**, not **"you are a specific person"**. Anyone holding that one string can act as anyone. Real auth needs each user to have their **own** provable identity — that's what the rest of this file builds.
+
+---
+
+## 3. Password Hashing — Never Store Passwords Directly
+
+### Why hashing, not encryption
+- **Encryption** is reversible (two-way) — meant for data you need to read back later
+- **Hashing** is one-way — meant for data you only ever need to *verify*, never retrieve
+
+A password should be **hashed**, never encrypted — even you, the developer, should be mathematically unable to recover the original password from what's stored in the database.
+
+### `passlib` + `bcrypt`
+
+```python
+from passlib.context import CryptContext
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
+```
+
+```python
+hashed = hash_password("mysecret123")
+print(hashed)
+# '$2b$12$KIXQ4z9F8...' — long, irreversible string; different every time you hash
+# the SAME password (bcrypt includes a random "salt")
+
+verify_password("mysecret123", hashed)   # True
+verify_password("wrongpass", hashed)      # False
+```
+
+### Why `bcrypt` specifically
+
+`bcrypt` is deliberately **slow** — this is a feature, not a flaw. If someone steals your database's hashed passwords, `bcrypt`'s slowness makes brute-forcing millions of guesses per second computationally impractical. Fast hash algorithms (like plain SHA-256) are actually a poor choice for passwords specifically, because their speed helps an attacker, not you.
+
+### The "salt" — why identical passwords produce different hashes
+
+Two users with the same password `"password123"` will get **different** stored hashes — `bcrypt` automatically mixes in a random value (the "salt") before hashing, so identical passwords never produce identical stored hashes. This defeats precomputed "rainbow table" attacks. `passlib` handles this for you automatically; `verify_password` still works correctly because the salt is stored alongside the hash itself.
+
+---
+
+## 4. JWT Structure — What a Token Actually Is
+
+A JWT (JSON Web Token) is three base64-encoded segments joined by dots:
+
+```
+header.payload.signature
+```
+
+Example (decoded conceptually):
+```
+Header:    {"alg": "HS256", "typ": "JWT"}
+Payload:   {"sub": "alice@example.com", "exp": 1735689600}
+Signature: <cryptographic signature over header+payload, using your SECRET_KEY>
+```
+
+### What each part does
+
+- **Header** — states which signing algorithm was used (commonly `HS256`)
+- **Payload (claims)** — the actual data: `sub` (subject — usually a user identifier), `exp` (expiry, as a Unix timestamp), and anything else you choose to add
+- **Signature** — proves the token wasn't tampered with. Computed using your server's `SECRET_KEY`. If anyone alters the header or payload, the signature no longer matches, and verification fails
+
+### Critical: the payload is NOT encrypted, only signed
+
+Anyone can base64-**decode** a JWT and read its payload in plain text — try pasting any JWT into [jwt.io](https://jwt.io) to see this directly. The signature only prevents **tampering**, not **reading**.
+
+**Rule: never put sensitive data (passwords, secrets) in a JWT payload.** Only put things that are safe to be publicly readable — a user ID, an email, a role, an expiry time.
+
+---
+
+## 5. Creating and Verifying Tokens — `python-jose`
+
+```python
+from jose import jwt, JWTError
+from datetime import datetime, timedelta
+
+SECRET_KEY = settings.secret_key   # from .env — never hardcode this
+ALGORITHM = "HS256"
+
+def create_access_token(data: dict, expires_delta: timedelta = timedelta(minutes=30)) -> str:
+    to_encode = data.copy()
+    expire = datetime.utcnow() + expires_delta
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def decode_access_token(token: str) -> dict:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+```
+
+```python
+token = create_access_token({"sub": "alice@example.com"})
+print(token)
+# eyJhbGciOiJIUzI1NiIs...
+
+payload = decode_access_token(token)
+print(payload)
+# {'sub': 'alice@example.com', 'exp': 1735689600}
+```
+
+### Expiry is handled automatically
+
+`jwt.decode` checks the `exp` claim internally — if the token has expired, it raises `JWTError` on its own. You never need to manually compare timestamps yourself.
+
+### Why `SECRET_KEY` must stay secret
+
+Anyone who has your `SECRET_KEY` can forge a **valid** signature for *any* payload they want — including impersonating any user. This is exactly why it lives in `.env`, never hardcoded, never committed to git — same handling as your database password.
+
+---
+
+## 6. `OAuth2PasswordBearer` — Telling FastAPI Where the Token Lives
 
 ```python
 from fastapi.security import OAuth2PasswordBearer
@@ -45,227 +151,76 @@ from fastapi.security import OAuth2PasswordBearer
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 ```
 
-`oauth2_scheme` is a **dependency** (the same `Depends()` mechanism covered in Phase 4). Used on a route:
+This isn't magic — it's a small, declarative piece telling FastAPI: *"expect an `Authorization: Bearer <token>` header on protected routes, and extract just the token substring for me."* `tokenUrl="token"` tells Swagger UI's "Authorize" button which route to actually call to *get* a token in the first place.
+
+### Using it as a dependency to identify the current user
 
 ```python
-@app.get("/me")
-def get_me(token: str = Depends(oauth2_scheme)):
-    ...
-```
-
-it does exactly one job: **extract the token from the `Authorization: Bearer <token>` header**, raising `401` automatically if that header is missing or malformed. It does **not** verify the token's signature or expiry — that remains a separate step, using `decode_access_token` or equivalent, same as the manual `Header()` version built earlier.
-
-### 2.2 `tokenUrl` — What It's Actually For
-
-```python
-OAuth2PasswordBearer(tokenUrl="token")
-```
-
-This is **not** a URL the code calls internally. It is metadata telling Swagger UI: *"if a user clicks 'Authorize,' send their login form to this path."* Swagger reads this value to wire up its own UI — it has no effect on the route's runtime behavior otherwise.
-
-### 2.3 Comparison — Manual Header Extraction vs. This Class
-
-| | Manual `Header(...)` | `OAuth2PasswordBearer` |
-|---|---|---|
-| Extracts token from `Authorization` header | Handled manually (or worked around via an `x-token` header, due to Swagger's special-casing of a header literally named `authorization`) | Automatic |
-| Missing header handling | Checked and raised manually | Automatic `401` |
-| Swagger "Authorize" button | Does not integrate | Works out of the box |
-| Actual verification (signature/expiry) | Manual, same either way | Still manual — this tool only extracts, never verifies |
-
-**Key point:** `OAuth2PasswordBearer` does not replace `decode_access_token` at all — it only replaces the *extraction* step. Verification logic stays exactly as built before.
-
-### 2.4 Rebuilding `/me` With It
-
-```python
-from fastapi.security import OAuth2PasswordBearer
-from fastapi import Depends, HTTPException
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
-
-def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
+def get_current_customer(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+) -> Customer:
     payload = decode_access_token(token)
-    if payload is None:
-        raise HTTPException(status_code=401, detail="Invalid or expired token!")
-    return payload
-
-
-@app.get("/me")
-def get_me(payload: dict = Depends(get_current_user)):
-    return {"email": payload.get("sub")}
+    email = payload.get("sub")
+    customer = get_customer_by_email(db, email)
+    if customer is None:
+        raise HTTPException(status_code=401, detail="Customer not found")
+    return customer
 ```
 
-This is a **nested dependency** (Phase 4 concept, reused directly) — `get_me` depends on `get_current_user`, which depends on `oauth2_scheme`. Same chain-resolution mechanics covered earlier, no new concept.
+This is the direct, real replacement for `key_validation` — except now it identifies **which** specific user is making the request, not just "someone who knows a shared secret."
+
+### Why this avoids the earlier Swagger `authorization` header bug
+
+Recall the earlier `422` bug where a header literally named `authorization` was mishandled by Swagger's reserved-field special-casing. `OAuth2PasswordBearer` is specifically built to integrate correctly with that exact Swagger mechanism — it's the intended, proper way to use the `Authorization` header, not a workaround.
 
 ---
 
-## Part 3 — `OAuth2PasswordRequestForm` in Depth
-
-### 3.1 What It Actually Does
+## 7. The Login Flow — `OAuth2PasswordRequestForm`
 
 ```python
 from fastapi.security import OAuth2PasswordRequestForm
+from fastapi import Depends
 
-@app.post("/token")
-def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    ...
-```
+@router.post("/token")
+def login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db),
+):
+    customer = get_customer_by_email(db, form_data.username)   # "username" field holds the email
+    if customer is None or not verify_password(form_data.password, customer.hashed_password):
+        raise HTTPException(status_code=401, detail="Incorrect email or password")
 
-Reads **form-encoded** POST data (not JSON) into a structured object with these fields:
-- `form_data.username` — holds the email in this project's case (OAuth2 spec names it "username" generically)
-- `form_data.password`
-- `form_data.grant_type`, `form_data.scope`, `form_data.client_id`, `form_data.client_secret` — OAuth2-standard extras, mostly unused in a simple password-flow setup
-
-### 3.2 Why Form Data, Not JSON
-
-This is dictated by the OAuth2 spec itself, not a FastAPI preference — the Password flow standard specifies form-encoded submission. This exact shape is what Swagger's "Authorize" login popup submits, which is why using this class (rather than a custom Pydantic body) makes that built-in UI function correctly.
-
-### 3.3 Rebuilding the Login Route With It
-
-```python
-from fastapi.security import OAuth2PasswordRequestForm
-
-@app.post("/token")
-def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    email = form_data.username
-    if email not in USERS:
-        raise HTTPException(status_code=401, detail="Invalid username, register first")
-    if not verify_password(form_data.password, USERS[email]["hashed_password"]):
-        raise HTTPException(status_code=401, detail="Incorrect password!")
-    access_token = create_access_token({"sub": email})
+    access_token = create_access_token(data={"sub": customer.email})
     return {"access_token": access_token, "token_type": "bearer"}
 ```
 
-**Route path convention:** `/token` (rather than `/login`) is the conventional name, matching `tokenUrl="token"` from `OAuth2PasswordBearer` — both should point at the same path.
+### Why `OAuth2PasswordRequestForm`, not a Pydantic body
 
-### 3.4 The Swagger UI "Authorize" Button, Once Both Pieces Are in Place
+This class expects **form-encoded** data (`username`/`password` fields) rather than JSON — matching the OAuth2 spec exactly. This specific shape is what makes Swagger's built-in "Authorize" button work seamlessly: clicking it presents a login form that submits directly in this expected format, no custom JSON body needed.
 
-With both classes wired up, `/docs` shows a padlock icon on protected routes and an "Authorize" button at the top. Clicking it opens a login form (username/password); submitting it calls `/token`, stores the returned access token internally, and **automatically attaches it** to every subsequent request made from within `/docs`. No manual copy/paste of a token into each request is needed — the concrete payoff of adopting these classes.
+### The response shape is a convention, not arbitrary
+
+```json
+{"access_token": "eyJhbGc...", "token_type": "bearer"}
+```
+`token_type: "bearer"` tells the client how to use the token on subsequent requests: `Authorization: Bearer <access_token>`. This exact key name/value is expected by OAuth2-compliant clients (including Swagger UI itself).
 
 ---
 
-## Part 4 — Scopes (Introduction)
+## 8. Putting It Together — The Full Request Lifecycle
 
-### 4.1 What Scopes Are
-
-Scopes let a token carry **fine-grained permissions**, beyond just identity. Example:
-
-```python
-oauth2_scheme = OAuth2PasswordBearer(
-    tokenUrl="token",
-    scopes={"read": "Read access", "write": "Write access", "admin": "Admin access"}
-)
-```
-
-A token can be issued with specific scopes (`["read", "write"]`), and individual routes can require specific scopes to be present:
-
-```python
-from fastapi.security import SecurityScopes
-
-def get_current_user(
-    security_scopes: SecurityScopes,
-    token: str = Depends(oauth2_scheme),
-) -> dict:
-    payload = decode_access_token(token)
-    token_scopes = payload.get("scopes", [])
-    for scope in security_scopes.scopes:
-        if scope not in token_scopes:
-            raise HTTPException(status_code=403, detail="Not enough permissions")
-    return payload
-```
-
-**Assessment:** scopes offer a more granular, standards-compliant approach to permissions than a simple `role` claim, but add real complexity. For a project like the Mobile Banking API, a simpler `role` claim (`"customer"`, `"admin"`) checked via a plain dependency (covered next, RBAC) is usually sufficient and easier to reason about. Scopes are more valuable in larger systems with many independently-grantable permissions (e.g. a public API where third-party apps request specific access levels).
+1. **Register** — client sends email + password → server hashes the password (`hash_password`) → stores the hash in `Customer.hashed_password`
+2. **Login** (`POST /token`) — client sends email + password (form-encoded) → server verifies password against the stored hash (`verify_password`) → server issues a signed JWT (`create_access_token`) → client receives and stores this token
+3. **Authenticated request** — client sends `Authorization: Bearer <token>` on every subsequent request → `oauth2_scheme` extracts the token → `decode_access_token` verifies the signature and expiry → `get_current_customer` looks up and returns the actual `Customer` object → route logic runs, now knowing exactly who's asking
 
 ---
 
-## Part 5 — Role-Based Access Control (RBAC) — The Practical Approach
+## 📌 Notes for Background
 
-### 5.1 A Simpler Alternative to Scopes — a `role` Claim
-
-```python
-access_token = create_access_token({"sub": customer.email, "role": customer.role})
-```
-
-### 5.2 Building Role-Checking Dependencies (Direct Application of Nested Dependencies)
-
-```python
-def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
-    payload = decode_access_token(token)
-    if payload is None:
-        raise HTTPException(status_code=401, detail="Invalid or expired token!")
-    return payload
-
-
-def require_admin(user: dict = Depends(get_current_user)) -> dict:
-    if user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Admin access required")
-    return user
-```
-
-```python
-@app.get("/admin/all_customers")
-def list_all_customers(admin: dict = Depends(require_admin)):
-    ...
-```
-
-This mirrors the nested-dependency pattern from Phase 4 (`get_current_admin` built on top of `get_current_user`) — no new concept, now backed by a real JWT-verified identity instead of a fake in-memory session dict.
+- JWT signature verification ≈ digital signatures in general cryptography, or how HTTPS certificates establish trust — same underlying trust model, applied to a token instead of a website
+- `bcrypt` password hashing ≈ conceptually the same as Java Spring Security's `BCryptPasswordEncoder` — same algorithm family, different language binding
+- Stateless JWT auth ≈ a signed session cookie in any modern web framework — the token itself carries proof of identity; no server-side session table lookup is needed to verify a request
+- `OAuth2PasswordBearer`/`OAuth2PasswordRequestForm` ≈ standardized "shapes" the OAuth2 spec defines, similar to how a fixed protocol format works in networking — using the spec's shape is what makes Swagger's tooling work out of the box, rather than something you built by hand
 
 ---
-
-## Part 6 — Moving Toward Production
-
-Everything above is functionally correct but has real gaps a production system must close.
-
-### 6.1 `SECRET_KEY` Generation
-
-```python
-import secrets
-print(secrets.token_hex(32))   # generates a real, cryptographically random secret
-```
-A memorable placeholder string is unsuitable for production — the real secret should be generated once, stored in `.env`, and never regenerated casually (regenerating invalidates every issued token).
-
-### 6.2 Token Revocation — The Biggest Gap in Pure Stateless JWT
-
-A stateless JWT, once issued, remains valid until it **naturally expires** — no built-in mechanism exists to invalidate it early (on logout, or if a token is stolen). Production systems typically add one of:
-- **A token blocklist** — a fast lookup (Redis, or a DB table) of revoked token IDs, checked on every request
-- **Short-lived access tokens + revocable refresh tokens** — the pattern covered earlier; revoking the refresh token in the DB keeps the damage window for a stolen access token naturally small
-
-### 6.3 HTTPS Only
-
-JWTs sent over plain HTTP are trivially interceptable — anyone on the network path can read the `Authorization` header. Production APIs must run behind HTTPS, often handled by a reverse proxy (Nginx) or the hosting platform rather than FastAPI itself — a hard requirement, not optional.
-
-### 6.4 Rate Limiting Login Attempts
-
-Without it, a login endpoint is vulnerable to brute-force password guessing. Production systems add rate limiting (e.g. `slowapi`, per the project roadmap's Phase 13) specifically on login/auth endpoints.
-
-### 6.5 Password Reset Flow
-
-Not yet covered — a real system needs a "forgot password" flow: generate a short-lived, single-use reset token, email it to the user, allow setting a new password. Same JWT mechanics, applied to a different purpose (a `type: "password_reset"` claim, very short expiry).
-
-### 6.6 Account Lockout / Suspicious Activity Detection
-
-Repeated failed login attempts on one account, or a refresh token used from two different locations in quick succession, are signals worth detecting and acting on (temporary lockout, forced re-verification) — genuinely advanced, but a real-world consideration.
-
-### 6.7 No Custom Cryptography Beyond This Point
-
-Everything covered here (bcrypt hashing, `python-jose` for JWT) uses well-vetted, standard libraries. The production gaps above concern **system design** (revocation, rate limiting, HTTPS), not custom cryptographic code. Any requirement that seems to need custom crypto is a signal to research existing solutions further, not to implement one from scratch.
-
----
-
-## Notes — Cross-Language Parallels
-
-- OAuth2 flows parallel different authentication strategies in Java Spring Security (`AuthenticationProvider` implementations) — same idea, different spec/ecosystem
-- Scopes parallel Java's fine-grained permission annotations, or AWS IAM policy scoping — narrow, composable grants of access
-- A token blocklist for revocation parallels a server-side session invalidation table — the stateful compromise layered on top of otherwise-stateless JWTs
-
----
-
-## Quick Self-Check
-- [ ] OAuth2 is a spec/framework, not a library
-- [ ] Which OAuth2 flow applies to a self-owned client+API project, and why
-- [ ] What `OAuth2PasswordBearer` does and does not do (extraction only, not verification)
-- [ ] Why `OAuth2PasswordRequestForm` uses form data instead of JSON
-- [ ] What makes Swagger's "Authorize" button work, concretely
-- [ ] The tradeoff between scopes and a simple role claim, and when each fits
-- [ ] At least three real gaps between a learning-project auth system and a production-ready one
-- [ ] Why a pure stateless JWT cannot be revoked early, and the two common fixes
