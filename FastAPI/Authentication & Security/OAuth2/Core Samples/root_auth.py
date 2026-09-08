@@ -13,7 +13,7 @@ def hash_password(password:str)->str:
 def verify_password(plain_paasword:str,hashed_password:str)->bool:
     return pwd_context.verify(plain_paasword,hashed_password)
 
-def create_access_token(data:dict,expires_delta:timedelta=timedelta(seconds=60)):
+def create_access_token(data:dict,expires_delta:timedelta=timedelta(minutes=5)):
     to_encode=data.copy()
     expire=datetime.now(timezone.utc)+expires_delta
     to_encode.update({"exp":expire})
