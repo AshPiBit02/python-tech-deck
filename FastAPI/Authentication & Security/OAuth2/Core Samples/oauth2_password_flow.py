@@ -11,10 +11,12 @@ def get_user(token:str=Depends(oauth2_scheme)):
     payload=decode_access_token(token)
     if not payload:
         raise HTTPException(status_code=401,detail="Invalid or expired token")
-    return payload
+    user_id=next(id for id,user in USERS.items() if user["email"]==payload.get("sub"))
+    info=USERS[user_id]["about"]
+    return {"user_id":user_id,"email":payload.get("sub"),"role":payload.get("role"),"about":info}
 
 @app.post("/register")
-def register_user(email:str=Header(...),password:str=Header(...),confirm_password:str=Header(...),role:str=Header(...)):
+def register_user(email:str=Header(...),password:str=Header(...),confirm_password:str=Header(...),role:str=Header(...),about:str|None=None):
     if password!=confirm_password:
         raise HTTPException(status_code=400,detail="Password didn't match")
     for user in USERS.values():
@@ -22,7 +24,7 @@ def register_user(email:str=Header(...),password:str=Header(...),confirm_passwor
             raise HTTPException(status_code=400,detail="Email already registered")
     user_id=f"user{len(USERS)+1}"
     hashed_password=hash_password(password)
-    USERS[user_id]={"email":email,"password":hashed_password,"role":role}
+    USERS[user_id]={"email":email,"password":hashed_password,"role":role,"about":about}
     return {"message":f"User {user_id} registered"}
 
 @app.post("/token")
@@ -36,6 +38,7 @@ def login(form_data:OAuth2PasswordRequestForm=Depends()):
 @app.get("/me")
 def get_me(user:dict=Depends(get_user)):
     return user
+
 
 
 
