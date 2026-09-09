@@ -28,3 +28,7 @@ def get_me(user:dict=Depends(get_current_user)):
 def get_balance(user:dict=Depends(get_current_user)):
     email=user.get("sub")
     return {"email":email,"balance":1050}
+
+@app.get("/protected-test")
+def protected_test(token:str=Depends(oauth2_scheme)):
+    return {"token_received":token}
