@@ -6,6 +6,12 @@ oauth2_scheme=OAuth2PasswordBearer(tokenUrl="token")
 
 FAKE_USERS={"dummy@gmail.com":{"hashed_password":hash_password("secret123")}}
 
+def get_current_user(token:str=Depends(oauth2_scheme))->dict:
+    payload=decode_access_token(token)
+    if payload is None:
+        raise HTTPException(status_code=401,detail="Invalid or expired token")
+    return payload
+
 @app.post("/token")
 def login(form_data:OAuth2PasswordRequestForm=Depends()):
     user=FAKE_USERS.get(form_data.username)
@@ -15,8 +21,14 @@ def login(form_data:OAuth2PasswordRequestForm=Depends()):
     return {"access_token":access_token,"token_type":"bearer"}
 
 @app.get("/me")
-def get_me(token:str=Depends(oauth2_scheme)):
-    payload=decode_access_token(token)
-    if payload is None:
-        raise HTTPException(status_code=401,detail="Invalid or expired token")
-    return {"email":payload.get("sub")}
+def get_me(user:dict=Depends(get_current_user)):
+    return {"email":user.get("sub")}
+
+@app.get("/balance")
+def get_balance(user:dict=Depends(get_current_user)):
+    email=user.get("sub")
+    return {"email":email,"balance":1050}
+
+@app.get("/protected-test")
+def protected_test(token:str=Depends(oauth2_scheme)):
+    return {"token_received":token}
