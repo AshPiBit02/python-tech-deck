@@ -15,6 +15,11 @@ def get_user(token:str=Depends(oauth2_scheme)):
     info=USERS[user_id]["about"]
     return {"user_id":user_id,"email":payload.get("sub"),"role":payload.get("role"),"about":info}
 
+def get_users_list(current_user:dict=Depends(get_user)):
+    if current_user["role"]!="admin":
+        raise HTTPException(status_code=403,detail="Access Denied")
+    return {uid: {k:v for k,v in u.items() if k!="password"} for uid, u in USERS.items()}
+
 @app.post("/register")
 def register_user(email:str=Header(...),password:str=Header(...),confirm_password:str=Header(...),role:str=Header(...),about:str|None=None):
     if password!=confirm_password:
@@ -39,9 +44,6 @@ def login(form_data:OAuth2PasswordRequestForm=Depends()):
 def get_me(user:dict=Depends(get_user)):
     return user
 
-
-
-
-    
-
-
+@app.get("/user/list")
+def get_users_list(users:dict=Depends(get_users_list)):
+    return users
