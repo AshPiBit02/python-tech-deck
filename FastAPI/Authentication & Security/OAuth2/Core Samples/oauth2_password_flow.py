@@ -1,22 +1,36 @@
 from fastapi import Depends,HTTPException,Header,FastAPI
 from fastapi.security import OAuth2PasswordRequestForm,OAuth2PasswordBearer
-from root_auth import hash_password,create_access_token,verify_password,decode_access_token
+from root_auth import hash_password,create_access_token,verify_password,decode_access_token,create_refresh_token
+from pydantic import BaseModel
 
 app=FastAPI()
 oauth2_scheme=OAuth2PasswordBearer(tokenUrl="token")
+optional_oauth2=OAuth2PasswordBearer(tokenUrl="token",auto_error=False)
 
 USERS:dict[str,dict]={}
+REFRESH_TOKENS:set[str]=set()
+
+def block_if_logged_in(token:str=Depends(optional_oauth2)):
+    if token:
+        payload=decode_access_token(token)
+        if payload and payload.get("role")!="admin":
+            raise HTTPException(status_code=403,detail="Registration disabled for logged-in users")
 
 def get_user(token:str=Depends(oauth2_scheme)):
     payload=decode_access_token(token)
-    if not payload:
+    if not payload or payload.get("type")!="access":
         raise HTTPException(status_code=401,detail="Invalid or expired token")
     user_id=next(id for id,user in USERS.items() if user["email"]==payload.get("sub"))
     info=USERS[user_id]["about"]
     return {"user_id":user_id,"email":payload.get("sub"),"role":payload.get("role"),"about":info}
 
+def users_list(current_user:dict=Depends(get_user)):
+    if current_user["role"]!="admin":
+        raise HTTPException(status_code=403,detail="Access Denied")
+    return {uid: {k:v for k,v in u.items() if k!="password"} for uid, u in USERS.items()}
+
 @app.post("/register")
-def register_user(email:str=Header(...),password:str=Header(...),confirm_password:str=Header(...),role:str=Header(...),about:str|None=None):
+def register_user(email:str=Header(...),password:str=Header(...),confirm_password:str=Header(...),role:str=Header(...),about:str|None=None,_:None=Depends(block_if_logged_in)):
     if password!=confirm_password:
         raise HTTPException(status_code=400,detail="Password didn't match")
     for user in USERS.values():
@@ -32,16 +46,36 @@ def login(form_data:OAuth2PasswordRequestForm=Depends()):
     user = next((u for u in USERS.values() if u["email"]==form_data.username),None)
     if user is None or not verify_password(form_data.password,user["password"]):
         raise HTTPException(status_code=401,detail="Invalid email or password")
-    access_token=create_access_token({"sub":user["email"],"role":user["role"]})
-    return {"access_token":access_token,"token_type":"bearer"}
+
+    access_token=create_access_token({"sub":user["email"],"role":user["role"],"type":"access"})
+    refresh_token=create_refresh_token({"sub":user["email"],"role":user["role"],"type":"refresh"})
+    REFRESH_TOKENS.add(refresh_token)
+    return {"access_token":access_token,"refresh_token":refresh_token,"token_type":"bearer"}
+
+class RefreshRequest(BaseModel):
+    refresh_token:str
+
+@app.post("/token/refresh")
+def refresh_token_endpoint(body:RefreshRequest):
+    if body.refresh_token not in REFRESH_TOKENS:
+        raise HTTPException(status_code=401,detail="Invalid or revoked refresh token")
+
+    payload=decode_access_token(body.refresh_token)
+    if not payload or payload.get("type")!="refresh":
+        raise HTTPException(status_code=401,detail="Invalid or expired token")
+
+    new_access_token=create_access_token({"sub":payload["sub"],"role":payload["role"]})
+    return {"access_token":new_access_token,"token_type":"bearer"}
+
+@app.post("/logout")
+def logout(body:RefreshRequest):
+    REFRESH_TOKENS.discard(body.refresh_token)
+    return {"message":"Logged out"}
 
 @app.get("/me")
 def get_me(user:dict=Depends(get_user)):
     return user
 
-
-
-
-    
-
-
+@app.get("/user/list")
+def get_users_list(users:dict=Depends(users_list)):
+    return users
