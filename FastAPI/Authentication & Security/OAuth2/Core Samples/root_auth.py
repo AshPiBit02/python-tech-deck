@@ -25,3 +25,7 @@ def decode_access_token(token:str)->dict:
     except JWTError:
         return None
 
+def create_refresh_token(data:dict,expires_delta:timedelta=timedelta(days=7)):
+    return create_access_token(data,timedelta(days=7))
+
+
