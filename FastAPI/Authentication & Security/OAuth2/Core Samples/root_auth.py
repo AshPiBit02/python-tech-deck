@@ -26,6 +26,9 @@ def decode_access_token(token:str)->dict:
         return None
 
 def create_refresh_token(data:dict,expires_delta:timedelta=timedelta(days=7)):
-    return create_access_token(data,timedelta(days=7))
+    to_encode=data.copy()
+    expires=datetime.now(timezone.utc)+expires_delta
+    to_encode.update({"exp":expires})
+    return jwt.encode(to_encode,SECRET_KEY,algorithm=ALGORITHM)
 
 
