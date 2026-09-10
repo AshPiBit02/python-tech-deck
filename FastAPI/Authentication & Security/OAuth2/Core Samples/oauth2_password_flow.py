@@ -1,12 +1,14 @@
 from fastapi import Depends,HTTPException,Header,FastAPI
 from fastapi.security import OAuth2PasswordRequestForm,OAuth2PasswordBearer
 from root_auth import hash_password,create_access_token,verify_password,decode_access_token,create_refresh_token
+from pydantic import BaseModel
 
 app=FastAPI()
 oauth2_scheme=OAuth2PasswordBearer(tokenUrl="token")
 optional_oauth2=OAuth2PasswordBearer(tokenUrl="token",auto_error=False)
 
 USERS:dict[str,dict]={}
+REFRESH_TOKENS:set[str]=set()
 
 def block_if_logged_in(token:str=Depends(optional_oauth2)):
     if token:
@@ -16,7 +18,7 @@ def block_if_logged_in(token:str=Depends(optional_oauth2)):
 
 def get_user(token:str=Depends(oauth2_scheme)):
     payload=decode_access_token(token)
-    if not payload:
+    if not payload or payload.get("type")!="access":
         raise HTTPException(status_code=401,detail="Invalid or expired token")
     user_id=next(id for id,user in USERS.items() if user["email"]==payload.get("sub"))
     info=USERS[user_id]["about"]
@@ -44,9 +46,30 @@ def login(form_data:OAuth2PasswordRequestForm=Depends()):
     user = next((u for u in USERS.values() if u["email"]==form_data.username),None)
     if user is None or not verify_password(form_data.password,user["password"]):
         raise HTTPException(status_code=401,detail="Invalid email or password")
-    access_token=create_access_token({"sub":user["email"],"role":user["role"]})
-    refresh_token=create_refresh_token({"sub":user["email"],"role":user["role"]})
+    access_token=create_access_token({"sub":user["email"],"role":user["role"],"type":"access"})
+    refresh_token=create_refresh_token({"sub":user["email"],"role":user["role"],"type":"refresh"})
+    REFRESH_TOKENS.add(refresh_token)
     return {"access_token":access_token,"refresh_token":refresh_token,"token_type":"bearer"}
+
+class RefreshRequest(BaseModel):
+    refresh_token:str
+
+@app.post("/token/refresh")
+def refresh_token_endpoint(body:RefreshRequest):
+    if body.refresh_token not in REFRESH_TOKENS:
+        raise HTTPException(status_code=401,detail="Invalid or revoked refresh token")
+
+    payload=decode_access_token(body.refresh_token)
+    if not payload or payload.get("type")!="refresh":
+        raise HTTPException(status_code=401,detail="Invalid or expired token")
+
+    new_access_token=create_access_token({"sub":payload["sub"],"role":payload["role"]})
+    return {"access_token":new_access_token,"token_type":"bearer"}
+
+@app.post("/logout")
+def logout(body:RefreshRequest):
+    REFRESH_TOKENS.discard(body.refresh_token)
+    return {"message":"Logged out"}
 
 @app.get("/me")
 def get_me(user:dict=Depends(get_user)):
