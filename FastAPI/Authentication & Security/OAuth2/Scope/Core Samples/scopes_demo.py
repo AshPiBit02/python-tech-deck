@@ -46,3 +46,13 @@ def get_current_user(security_scopes:SecurityScopes,token:str=Depends(oauth2_sch
 
     return payload["sub"]
 
+@app.get("/notes")
+def read_notes(user:str=Security(get_current_user,scopes=["notes:read"])):
+    return {"user":user,"notes":NOTES}
+
+@app.post("/notes")
+def create_notes(text:str,user:str=Security(get_current_user,scopes=["notes:write"])):
+    note_id=str(len(NOTES)+1)
+    NOTES[note_id]=text
+    return {"user":user,"create":note_id}
+
