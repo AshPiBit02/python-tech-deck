@@ -4,8 +4,15 @@ from root_auth import hash_password,create_access_token,verify_password,decode_a
 
 app=FastAPI()
 oauth2_scheme=OAuth2PasswordBearer(tokenUrl="token")
+optional_oauth2=OAuth2PasswordBearer(tokenUrl="token",auto_error=False)
 
 USERS:dict[str,dict]={}
+
+def block_if_logged_in(token:str=Depends(optional_oauth2)):
+    if token:
+        payload=decode_access_token(token)
+        if payload:
+            raise HTTPException(status_code=403,detail="Registration disabled for logged-in users")
 
 def get_user(token:str=Depends(oauth2_scheme)):
     payload=decode_access_token(token)
