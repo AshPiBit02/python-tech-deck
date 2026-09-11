@@ -61,7 +61,7 @@ def login(form_data:OAuth2PasswordRequestForm=Depends()):
 
 def decode_token(token:str)->dict:
     try:
-        jwt.decode(token,SECRET_KEY,algorithms=[ALGORITHM])
+        return jwt.decode(token,SECRET_KEY,algorithms=[ALGORITHM])
     except JWTError:
         raise HTTPException(status_code=401,detail="Invalid or expired token")
     
@@ -98,7 +98,7 @@ def replace_note(note_id:str,note:str,password:str,user:str=Security(current_use
     return {"user":user,"replaced":note_id}
 
 @app.delete("/notes/{note_id}")
-def delete_note(note_id:str,password:str,user:str=Security(current_user_require_any_scopes),scopes=["notes:delete","noes:admin"]):
+def delete_note(note_id:str,password:str,user:str=Security(current_user_require_any_scopes,scopes=["notes:delete","noes:admin"])):
     if FAKE_USERS[user]["password"]!=password:
         raise HTTPException(status_code=403,detail="Incorrect password. Note deletion failed!")
     NOTES.pop(note_id,None)
