@@ -63,4 +63,23 @@ def get_current_user(security_scopes:SecurityScopes,token:str=Depends(oauth2_sch
             raise HTTPException(status_code=403,detail=f"Missing scope {scope}")
     return payload["sub"]
 
+@app.get("notes")
+def read_notes(user:str=SecurityScopes(get_current_user,scopes=["notes:read"])):
+    return {"user":user,"notes":NOTES}
+
+@app.post("/notes")
+def create_notes(note:str,user:str=Security(get_current_user,scopes=["notes:write"])):
+    note_id=f"{len(NOTES)+1}"
+    NOTES[note_id]=note
+    return {"user":user,"created":note_id}
+
+@app.put("/notes/{note_id}")
+def replace_note(note_id:str,note:str,user:str=Security(get_current_user,scopes=["notes:read","notes:write"])):
+    NOTES[note_id]=note
+    return {"user":user,"replaced":note_id}
+
+@app.delete("/notes/{note_id}")
+def delete_note(note_id:str,user:str=Security(get_current_user,scopes=["notes:delete"])):
+    NOTES.pop(note_id,None)
+    return {"user":user,"deleted":note_id}
 
