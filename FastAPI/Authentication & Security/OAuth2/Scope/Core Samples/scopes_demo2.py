@@ -63,8 +63,8 @@ def get_current_user(security_scopes:SecurityScopes,token:str=Depends(oauth2_sch
             raise HTTPException(status_code=403,detail=f"Missing scope {scope}")
     return payload["sub"]
 
-@app.get("notes")
-def read_notes(user:str=SecurityScopes(get_current_user,scopes=["notes:read"])):
+@app.get("/notes")
+def read_notes(user:str=Security(get_current_user,scopes=["notes:read"])):
     return {"user":user,"notes":NOTES}
 
 @app.post("/notes")
