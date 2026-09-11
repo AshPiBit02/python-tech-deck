@@ -41,3 +41,26 @@ def create_token(username:str,scopes:list[str]):
     payload={"sub":username,"scopes":expand_scopes(scopes),"exp":datetime.now(timezone.utc)+timedelta(minutes=30)}
     return jwt.encode(payload,SECRET_KEY,algorithm=ALGORITHM)
 
+@app.post("/token")
+def login(form_data:OAuth2PasswordRequestForm=Depends()):
+    user=FAKE_USERS.get(form_data.username)
+    if not user or user["password"]!=form_data.password:
+        raise HTTPException(status_code=401,detail="Invalid credentials")
+
+    granted=[s for s in form_data.scopes if s in user["allowed_scopes"]]
+    token=create_token(form_data.username,granted)
+    return {"access_token":token,"token_type":"bearer"}
+
+def get_current_user(security_scopes:SecurityScopes,token:str=Depends(oauth2_scheme)):
+    try:
+        payload=jwt.decode(token,SECRET_KEY,algorithms=[ALGORITHM])
+    except JWTError:
+        raise HTTPException(status_code=401,detail="Invalid or expired token")
+
+    token_scopes=payload.get("scopes",[])
+    for scope in security_scopes.scopes:
+        if scope not in token_scopes:
+            raise HTTPException(status_code=403,detail=f"Missing scope {scope}")
+    return payload["sub"]
+
+
