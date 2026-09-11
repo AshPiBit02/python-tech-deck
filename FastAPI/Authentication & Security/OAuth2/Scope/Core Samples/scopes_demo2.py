@@ -56,7 +56,7 @@ def login(form_data:OAuth2PasswordRequestForm=Depends()):
         "token_type":"bearer",
         "granted_scopes":granted,
         "denied_scopes":denied,
-        "denied_reasons":{s:f"not permitted for {user}" for s in denied},
+        "denied_reasons":{s:f"not permitted for {form_data.username}" for s in denied},
         }
 
 def decode_token(token:str)->dict:
