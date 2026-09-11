@@ -22,10 +22,22 @@ SCOPE_HIERARCHY={
 }
 
 FAKE_USERS={
-    "viewer":{"password":"pass","allowed_scopes":["notes:read"]}
+    "viewer":{"password":"pass","allowed_scopes":["notes:read"]},
+    "boss":{"password":"pass","allowed_scopes":["notes:admin"]},
 }
 
 NOTES={
     "1":"Buy electronics",
     "2":"Practice NM",
 }
+
+def expand_scopes(scopes:list[str])->list[str]:
+    expanded=set(scopes)
+    for scope in scopes:
+        expanded.update(SCOPE_HIERARCHY.get(scope,[]))
+    return list(expanded)
+
+def create_token(username:str,scopes:list[str]):
+    payload={"sub":username,"scopes":expand_scopes(scopes),"exp":datetime.now(timezone.utc)+timedelta(minutes=30)}
+    return jwt.encode(payload,SECRET_KEY,algorithm=ALGORITHM)
+
