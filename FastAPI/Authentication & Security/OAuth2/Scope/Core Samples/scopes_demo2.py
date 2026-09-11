@@ -59,12 +59,15 @@ def login(form_data:OAuth2PasswordRequestForm=Depends()):
         "denied_reasons":{s:f"not permitted for {user}" for s in denied},
         }
 
-def get_current_user(security_scopes:SecurityScopes,token:str=Depends(oauth2_scheme)):
+def decode_token(token:str)->dict:
     try:
-        payload=jwt.decode(token,SECRET_KEY,algorithms=[ALGORITHM])
+        jwt.decode(token,SECRET_KEY,algorithms=[ALGORITHM])
     except JWTError:
         raise HTTPException(status_code=401,detail="Invalid or expired token")
+    
 
+def get_current_user(security_scopes:SecurityScopes,token:str=Depends(oauth2_scheme)):
+    payload=decode_token(token)
     token_scopes=payload.get("scopes",[])
     for scope in security_scopes.scopes:
         if scope not in token_scopes:
