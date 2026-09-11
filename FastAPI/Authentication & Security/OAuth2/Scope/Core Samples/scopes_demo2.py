@@ -47,9 +47,17 @@ def login(form_data:OAuth2PasswordRequestForm=Depends()):
     if not user or user["password"]!=form_data.password:
         raise HTTPException(status_code=401,detail="Invalid credentials")
 
-    granted=[s for s in form_data.scopes if s in user["allowed_scopes"]]
+    requested=form_data.scopes
+    granted=[s for s in requested if s in user["allowed_scopes"]]
+    denied=[s for s in requested if s not in user["allowed_scopes"]]
     token=create_token(form_data.username,granted)
-    return {"access_token":token,"token_type":"bearer"}
+    return {
+        "access_token":token,
+        "token_type":"bearer",
+        "granted_scopes":granted,
+        "denied_scopes":denied,
+        "denied_reasons":{s:f"not permitted for {user}" for s in denied},
+        }
 
 def get_current_user(security_scopes:SecurityScopes,token:str=Depends(oauth2_scheme)):
     try:
