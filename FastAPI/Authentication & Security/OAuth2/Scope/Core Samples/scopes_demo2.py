@@ -65,8 +65,7 @@ def decode_token(token:str)->dict:
     except JWTError:
         raise HTTPException(status_code=401,detail="Invalid or expired token")
     
-
-def get_current_user(security_scopes:SecurityScopes,token:str=Depends(oauth2_scheme)):
+def current_user_require_all_scopes(security_scopes:SecurityScopes,token:str=Depends(oauth2_scheme)):
     payload=decode_token(token)
     token_scopes=payload.get("scopes",[])
     for scope in security_scopes.scopes:
@@ -74,25 +73,32 @@ def get_current_user(security_scopes:SecurityScopes,token:str=Depends(oauth2_sch
             raise HTTPException(status_code=403,detail=f"Missing scope {scope}")
     return payload["sub"]
 
+def current_user_require_any_scopes(security_scopes:SecurityScopes,token:str=Depends(oauth2_scheme)):
+    payload=decode_token(token)
+    token_scopes=payload.get("scopes",[])
+    if security_scopes.scopes and not any(s in token_scopes for s in security_scopes.scopes):
+        raise HTTPException(status_code=403,detail=f"Requires at least on of: {security_scopes.scopes}")
+    return payload["sub"]
+
 @app.get("/notes")
-def read_notes(user:str=Security(get_current_user,scopes=["notes:read"])):
+def read_notes(user:str=Security(current_user_require_any_scopes,scopes=["notes:read","notes:admin"])):
     return {"user":user,"notes":NOTES}
 
 @app.post("/notes")
-def create_notes(note:str,user:str=Security(get_current_user,scopes=["notes:write"])):
+def create_notes(note:str,user:str=Security(current_user_require_any_scopes,scopes=["notes:write","notes:admin"])):
     note_id=f"{len(NOTES)+1}"
     NOTES[note_id]=note
     return {"user":user,"created":note_id}
 
 @app.put("/notes/{note_id}")
-def replace_note(note_id:str,note:str,password:str,user:str=Security(get_current_user,scopes=["notes:read","notes:write"])):
+def replace_note(note_id:str,note:str,password:str,user:str=Security(current_user_require_all_scopes,scopes=["notes:read","notes:write"])):
     if FAKE_USERS[user]["password"]!=password:
         raise HTTPException(status_code=403,detail="Incorrect password. Note replacement failed!")
     NOTES[note_id]=note
     return {"user":user,"replaced":note_id}
 
 @app.delete("/notes/{note_id}")
-def delete_note(note_id:str,password:str,user:str=Security(get_current_user,scopes=["notes:delete"])):
+def delete_note(note_id:str,password:str,user:str=Security(current_user_require_any_scopes),scopes=["notes:delete","noes:admin"]):
     if FAKE_USERS[user]["password"]!=password:
         raise HTTPException(status_code=403,detail="Incorrect password. Note deletion failed!")
     NOTES.pop(note_id,None)
