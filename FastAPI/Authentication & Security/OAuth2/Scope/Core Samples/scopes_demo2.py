@@ -74,12 +74,17 @@ def create_notes(note:str,user:str=Security(get_current_user,scopes=["notes:writ
     return {"user":user,"created":note_id}
 
 @app.put("/notes/{note_id}")
-def replace_note(note_id:str,note:str,user:str=Security(get_current_user,scopes=["notes:read","notes:write"])):
+def replace_note(note_id:str,note:str,password:str,user:str=Security(get_current_user,scopes=["notes:read","notes:write"])):
+    if FAKE_USERS[user]["password"]!=password:
+        raise HTTPException(status_code=403,detail="Incorrect password. Note replacement failed!")
     NOTES[note_id]=note
     return {"user":user,"replaced":note_id}
 
 @app.delete("/notes/{note_id}")
-def delete_note(note_id:str,user:str=Security(get_current_user,scopes=["notes:delete"])):
+def delete_note(note_id:str,password:str,user:str=Security(get_current_user,scopes=["notes:delete"])):
+    if FAKE_USERS[user]["password"]!=password:
+        raise HTTPException(status_code=403,detail="Incorrect password. Note deletion failed!")
     NOTES.pop(note_id,None)
     return {"user":user,"deleted":note_id}
+
 
