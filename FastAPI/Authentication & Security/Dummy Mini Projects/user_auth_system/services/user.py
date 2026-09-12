@@ -33,6 +33,8 @@ def update_user(db:Session,user_id:int,user_in:UserUpdate)->User:
     for key,value in update_data.items():
         if key=="password":
             setattr(db_user,"hashed_password",hash_password(value))
+        elif key=="role":
+
         else:
             setattr(db_user,key,value)
     db.commit()

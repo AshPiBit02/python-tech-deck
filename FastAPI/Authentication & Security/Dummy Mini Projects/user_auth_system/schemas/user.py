@@ -32,6 +32,7 @@ class UserOut(BaseModel):
 class UserUpdate(BaseModel):
     email:EmailStr|None=None
     password:str|None=None
+    role:Role|None=None
 
 
 class Token(BaseModel):
