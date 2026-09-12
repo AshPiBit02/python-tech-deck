@@ -1,8 +1,8 @@
-"""add refresh_tokens table
+"""create users and refresh_tokens tables
 
-Revision ID: f3fe9119925f
-Revises: 27742b821c5c
-Create Date: 2026-09-13 00:41:55.698541
+Revision ID: 2808a32103e2
+Revises: 
+Create Date: 2026-09-13 00:54:12.944850
 
 """
 from typing import Sequence, Union
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'f3fe9119925f'
-down_revision: Union[str, Sequence[str], None] = '27742b821c5c'
+revision: str = '2808a32103e2'
+down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -25,7 +25,7 @@ def upgrade() -> None:
     sa.Column('id', sa.INTEGER(), nullable=False),
     sa.Column('email', sa.String(length=255), nullable=False),
     sa.Column('hashed_password', sa.String(length=128), nullable=False),
-    sa.Column('role', sa.Enum('admin', 'user', name='role'), server_default='User', nullable=False),
+    sa.Column('role', sa.Enum('Admin', 'User', name='role'), server_default='User', nullable=False),
     sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=True),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('email')
