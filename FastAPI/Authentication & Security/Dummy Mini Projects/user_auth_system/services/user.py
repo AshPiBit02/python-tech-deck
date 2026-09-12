@@ -37,7 +37,7 @@ def update_user(db:Session,user_id:int,user_in:UserUpdate)->User:
     for key,value in update_data.items():
         if key=="password":
             setattr(db_user,"hashed_password",hash_password(value))
-        elif key=="role":
+        elif key=="role" and db_user.role!=Role.admin:
             verify_admin_key(user_in.admin_secret_key)
             setattr(db_user,key,value)
         else:
