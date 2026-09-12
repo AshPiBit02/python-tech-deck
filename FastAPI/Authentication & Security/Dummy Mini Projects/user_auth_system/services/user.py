@@ -17,10 +17,10 @@ def create_user(db:Session,user_in:UserRegistration)->User:
     if user_in.admin_secret_key is not None:
         verify_admin_key(user_in.admin_secret_key)
 
-    hash_password=hash_password(user_in.password)
+    bcrypt_password=hash_password(user_in.password)
     db_user=User(
         email=user_in.email,
-        hash_password=hash_password,
+        hashed_password=bcrypt_password,
         role=user_in.role,
         )
     db.add(db_user)
@@ -35,11 +35,12 @@ def update_user(db:Session,user_id:int,user_in:UserUpdate)->User:
 
     update_data=user_in.model_dump(exclude_unset=True)
     for key,value in update_data.items():
-        if key=="password":
-            setattr(db_user,"hashed_password",hash_password(value))
-        elif key=="role" and db_user.role!=Role.admin:
-            verify_admin_key(user_in.admin_secret_key)
+        if key=="role":
+            if value==Role.admin:
+                verify_admin_key(user_in.admin_secret_key)
             setattr(db_user,key,value)
+        elif key=="password":
+            setattr(db_user,"hashed_password",hash_password(value))
         else:
             setattr(db_user,key,value)
     db.commit()
