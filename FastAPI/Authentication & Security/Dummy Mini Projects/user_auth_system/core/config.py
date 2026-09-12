@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     db_name:str
     algorithm:str
     secret_key:str
+    admin_secret_key:str
 
     @property
     def database_url(self)->str:
