@@ -1,7 +1,6 @@
 from pydantic import BaseModel,EmailStr,field_validator,model_validator,ConfigDict
 from datetime import datetime
 from models.user import Role
-from core.config import settings
 
 class UserRegistration(BaseModel):
     email:EmailStr
@@ -21,8 +20,6 @@ class UserRegistration(BaseModel):
     def require_key_for_admin(self):
         if self.role==Role.admin and not self.admin_secret_key:
             raise ValueError("admin_secret_key is required to register as admin!")
-        elif self.admin_secret_key!=settings.admin_secret_key:
-            raise ValueError("Invalid admin key!")
 
 class UserOut(BaseModel):
     id:int
