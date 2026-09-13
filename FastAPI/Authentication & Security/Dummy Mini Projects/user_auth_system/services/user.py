@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from models.user import User,Role
 from schemas.user import UserRegistration,UserUpdate
 from core.security import hash_password
-from dependencies.auth import verify_admin_key
+from core.security import verify_admin_key
 
 def get_user_by_email(db:Session,email:str)->User|None:
     return db.query(User).filter(User.email==email).first()

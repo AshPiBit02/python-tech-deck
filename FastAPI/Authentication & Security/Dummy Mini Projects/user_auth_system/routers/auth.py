@@ -16,7 +16,10 @@ def register(db:database_dependency,user_in: UserRegistration):
     if user_in.password!=user_in.confirm_password:
         raise HTTPException(status_code=400,detail="Password do not match")
 
-    db_user=create_user(db,user_in)
+    try:
+        db_user=create_user(db,user_in)
+    except ValueError as e:
+        raise HTTPException(status_code=400,detail=f"Denied: {e}")
     return db_user
 
 @router.post("/token",response_model=Token)
