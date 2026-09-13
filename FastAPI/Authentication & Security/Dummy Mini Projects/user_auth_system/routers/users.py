@@ -11,14 +11,14 @@ router=APIRouter(tags=["users"])
 def read_me(current_user:User=Depends(get_current_user)):
     return current_user
 
-@router.patch("/me",response_model=UserOut)
+@router.patch("/me")
 def update_me(db:database_dependency,body:UserUpdate,current_user:User=Depends(get_current_user)):
     role_changed=body.role is not None and body.role!=current_user.role
     updated_user=update_user(db,current_user.id,body)
-
+    response=UserOut.model_validate(updated_user).model_dump()
     if role_changed:
-        raise HTTPException(status_code=200,detail="Role updated. Please log in again to receive a token with new role.")
-    return update_user
+        response["notice"]="Role updated. Please log in again to receive a token with new role."
+    return response
 
 @router.get("/admin/users",response_model=list[UserOut])
 def list_users(db:database_dependency,admin_user:User=Depends(require_admin)):
