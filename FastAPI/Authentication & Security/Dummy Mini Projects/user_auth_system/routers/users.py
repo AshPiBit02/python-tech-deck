@@ -13,7 +13,11 @@ def read_me(current_user:User=Depends(get_current_user)):
 
 @router.patch("/me",response_model=UserOut)
 def update_me(db:database_dependency,body:UserUpdate,current_user:User=Depends(get_current_user)):
+    role_changed=body.role is not None and body.role!=current_user.role
     updated_user=update_user(db,current_user.id,body)
+
+    if role_changed:
+        raise HTTPException(status_code=200,detail="Role updated. Please log in again to receive a token with new role.")
     return update_user
 
 @router.get("/admin/users",response_model=list[UserOut])
