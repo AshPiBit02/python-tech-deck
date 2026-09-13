@@ -46,3 +46,11 @@ def update_user(db:Session,user_id:int,user_in:UserUpdate)->User:
     db.commit()
     db.refresh(db_user)
     return db_user
+
+def delete_user(db:Session,user_id:int)->dict:
+    db_user=get_user_by_id(db,user_id)
+    if not db_user:
+        return None
+    db.delete(db_user)
+    db.commit()
+    return {"message":f"User with id {user_id} deleted successfully"}
