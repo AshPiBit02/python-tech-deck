@@ -1,15 +1,14 @@
 from core.config import settings
 from fastapi import Depends,HTTPException
 from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy.orm import Session
-from db.database import get_db
 from models.user import User,Role
 from services.user import get_user_by_id
 from core.security import decode_access_token
+from dependencies.db_dependency import database_dependency
 
 oauth2_scheme=OAuth2PasswordBearer(tokenUrl="token")
 
-def get_current_user(token:str=Depends(oauth2_scheme),db:Session=Depends(get_db))->User:
+def get_current_user(db:database_dependency,token:str=Depends(oauth2_scheme))->User:
     payload=decode_access_token(token)
     if not payload or payload.get("type")!="access":
         raise HTTPException(status_code=401,detail="Invalid or expired token")
