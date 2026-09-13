@@ -30,3 +30,23 @@ def login(db:database_dependency,form_data:OAuth2PasswordRequestForm=Depends()):
     store_refresh_token(db,refresh_token,db_user.id)
 
     return {"acccess_token":access_token,"refresh_token":refresh_token,"token_type":"bearer"}
+
+@router.post("/token/refresh",response_model=Token)
+def refresh_token_endpoint(body:RefreshRequest,db:database_dependency):
+    payload=decode_access_token(body.refresh_token)
+    if not payload or payload.get("type")!="refresh":
+        raise HTTPException(status_code=401,detail="Invalid or expired token")
+
+    db_token=get_valid_refresh_token(db,body.refresh_token)
+    if not db_token:
+        raise HTTPException(status_code=401,detail="Refresh token has been revoked or is unknown")
+
+    new_access_token=create_refresh_token({"sub":payload["sub"],"role":payload["role"]})
+    return {"access_token":new_access_token,"refresh_token":body.refresh_token,"token_type":"bearer"}
+
+@router.post("/logout")
+def logout(body:RefreshRequest,db:database_dependency):
+    revoked=revoke_refresh_token(db,body.refresh_token)
+    if not revoked:
+        raise HTTPException(status_code=404,detail="Refresh token not found")
+    return{"message":"Logged out"}
