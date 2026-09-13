@@ -2,6 +2,7 @@ from passlib.context import CryptContext
 from jose import jwt,JWTError
 from datetime import datetime,timedelta,timezone
 from core.config import settings
+from fastapi import HTTPException
 
 pwd_context=CryptContext(schemes=["bcrypt"],deprecated="auto")
 
@@ -29,4 +30,8 @@ def create_refresh_token(data:dict,expires_delta:timedelta=timedelta(days=7)):
     to_encode.update({"exp":expires})
     return jwt.encode(to_encode,settings.secret_key,algorithm=settings.algorithm)
 
+def verify_admin_key(admin_key:str)->None:
+    if admin_key!=settings.admin_secret_key:
+        raise ValueError("Invalid admin key!")
+    return None
 

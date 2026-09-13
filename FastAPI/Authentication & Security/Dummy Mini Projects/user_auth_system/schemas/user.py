@@ -20,6 +20,7 @@ class UserRegistration(BaseModel):
     def require_key_for_admin(self):
         if self.role==Role.admin and not self.admin_secret_key:
             raise ValueError("admin_secret_key is required to register as admin!")
+        return self
 
 class UserOut(BaseModel):
     id:int
@@ -32,6 +33,13 @@ class UserOut(BaseModel):
 class UserUpdate(BaseModel):
     email:EmailStr|None=None
     password:str|None=None
+    role:Role|None=None
+    admin_secret_key:str|None=None
+    @model_validator(mode="after")
+    def require_key_for_admin(self):
+        if self.role==Role.admin and not self.admin_secret_key:
+            raise ValueError("admin_secret_key is required to upgrade to admin role!")
+        return self
 
 
 class Token(BaseModel):
