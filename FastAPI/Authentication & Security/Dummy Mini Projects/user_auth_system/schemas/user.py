@@ -44,7 +44,7 @@ class UserUpdate(BaseModel):
 
 class Token(BaseModel):
     access_token:str
-    refres_token:str
+    refresh_token:str
     token_type:str="bearer"
 
 class RefreshRequest(BaseModel):

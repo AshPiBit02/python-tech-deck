@@ -32,7 +32,7 @@ def login(db:database_dependency,form_data:OAuth2PasswordRequestForm=Depends()):
     refresh_token=create_refresh_token({"sub":str(db_user.id),"role":db_user.role.value})
     store_refresh_token(db,refresh_token,db_user.id)
 
-    return {"acccess_token":access_token,"refresh_token":refresh_token,"token_type":"bearer"}
+    return {"access_token":access_token,"refresh_token":refresh_token,"token_type":"bearer"}
 
 @router.post("/token/refresh",response_model=Token)
 def refresh_token_endpoint(body:RefreshRequest,db:database_dependency):
