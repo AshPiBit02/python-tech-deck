@@ -14,7 +14,7 @@ def get_all_users(db:Session)->list[User]:
     return db.query(User).all()
 
 def create_user(db:Session,user_in:UserRegistration)->User:
-    if user_in.admin_secret_key is not None:
+    if user_in.role==Role.admin:
         verify_admin_key(user_in.admin_secret_key)
 
     bcrypt_password=hash_password(user_in.password)
