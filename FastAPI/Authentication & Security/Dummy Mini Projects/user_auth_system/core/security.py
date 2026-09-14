@@ -37,6 +37,6 @@ def verify_admin_key(admin_key:str)->None:
 
 def verify_pin(pin:str)->None:
     if pin!=settings.pin:
-        raise ValueError("Invalid PIN!")
+        raise HTTPException(status_code=403,detail="Invalid PIN!")
     return None
 
