@@ -32,7 +32,7 @@ def create_refresh_token(data:dict,expires_delta:timedelta=timedelta(days=7)):
 
 def verify_admin_key(admin_key:str)->None:
     if admin_key!=settings.admin_secret_key:
-        raise ValueError("Invalid admin key!")
+        raise HTTPException(status_code=402,detail="Invalid admin key!")
     return None
 
 def verify_pin(pin:str)->None:
