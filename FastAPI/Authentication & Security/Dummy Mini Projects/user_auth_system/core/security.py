@@ -15,7 +15,7 @@ def verify_password(plain_paasword:str,hashed_password:str)->bool:
 def create_access_token(data:dict,expires_delta:timedelta=timedelta(minutes=5)):
     to_encode=data.copy()
     expire=datetime.now(timezone.utc)+expires_delta
-    to_encode.update({"exp":expire})
+    to_encode.update({"exp":expire,"type":"access"})
     return jwt.encode(to_encode,settings.secret_key,algorithm=settings.algorithm)
 
 def decode_access_token(token:str)->dict:
@@ -27,7 +27,7 @@ def decode_access_token(token:str)->dict:
 def create_refresh_token(data:dict,expires_delta:timedelta=timedelta(days=7)):
     to_encode=data.copy()
     expires=datetime.now(timezone.utc)+expires_delta
-    to_encode.update({"exp":expires})
+    to_encode.update({"exp":expires,"type":"refresh"})
     return jwt.encode(to_encode,settings.secret_key,algorithm=settings.algorithm)
 
 def verify_admin_key(admin_key:str)->None:

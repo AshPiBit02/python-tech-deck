@@ -44,7 +44,7 @@ def refresh_token_endpoint(body:RefreshRequest,db:database_dependency):
     if not db_token:
         raise HTTPException(status_code=401,detail="Refresh token has been revoked or is unknown")
 
-    new_access_token=create_refresh_token({"sub":payload["sub"],"role":payload["role"]})
+    new_access_token=create_refresh_token({"sub":payload["sub"],"role":payload["role"],"type":"access"})
     return {"access_token":new_access_token,"refresh_token":body.refresh_token,"token_type":"bearer"}
 
 @router.post("/logout")
