@@ -35,3 +35,8 @@ def verify_admin_key(admin_key:str)->None:
         raise ValueError("Invalid admin key!")
     return None
 
+def verify_pin(pin:str)->None:
+    if pin!=settings.pin:
+        raise ValueError("Invalid PIN!")
+    return None
+

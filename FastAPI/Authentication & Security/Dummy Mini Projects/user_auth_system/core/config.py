@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     algorithm:str
     secret_key:str
     admin_secret_key:str
+    pin:str
 
     @property
     def database_url(self)->str:

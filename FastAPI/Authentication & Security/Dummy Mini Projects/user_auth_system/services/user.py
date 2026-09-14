@@ -28,7 +28,7 @@ def create_user(db:Session,user_in:UserRegistration)->User:
     db.refresh(db_user)
     return db_user
 
-def update_user(db:Session,user_id:int,user_in:UserUpdate)->User:
+def update_user(db:Session,user_id:int,user_in:UserUpdate,pin:str)->User:
     db_user=get_user_by_id(db,user_id)
     if not db_user:
         return None
