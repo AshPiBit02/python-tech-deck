@@ -21,3 +21,25 @@ def create_test_database():
     yield
     Base.metadata.drop_all(bind=test_engine)
 
+@pytest.fixture
+def db_session():
+    connection=test_engine.connect()
+    transaction=connection.begin()
+    session=TestingSessionLocal(bind=connection)
+
+    yield session
+
+    session.close()
+    transaction.rollback()
+    connection.close()
+
+@pytest.fixture
+def client(db_session):
+    def override_get_db():
+        yield db_session
+
+    app.dependency_overrides[get_db]=override_get_db
+    with TestClient(app) as test_client:
+        yield test_client
+    app.dependency_overrides.clear()
+
