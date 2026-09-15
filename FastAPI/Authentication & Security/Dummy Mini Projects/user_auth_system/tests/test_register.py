@@ -12,3 +12,14 @@ def test_register_success(client):
     assert body["role"]=="User"
     assert body["hashed_password"] not in body
 
+def test_register_duplicate_email(client):
+    payload={
+        "email":"notdummy@gmail.com",
+        "password":"jaldiTheLate",
+        "confirm_password":"jaldiTheLate",
+    }
+    client.post("/register",json=payload)
+    response=client.post("/register",json=payload)
+    assert response.status_code==400
+    assert "already registerd" in response.json()["detail"]
+
