@@ -11,6 +11,8 @@ from db.database import Base,get_db
 from models.user import User
 from models.refresh_token import RefreshToken
 from  main import app
+from services.user import create_user
+from schemas.user import UserRegistration
 
 test_engine=create_engine(settings.database_url)
 TestingSessionLocal=sessionmaker(bind=test_engine,autoflush=False,autocommit=False)
@@ -43,3 +45,12 @@ def client(db_session):
         yield test_client
     app.dependency_overrides.clear()
 
+
+@pytest.fixture
+def registered_user(db_session):
+    user_in=UserRegistration(
+        email="testuser@gmail.com",
+        password="strongpass",
+        confirm_password="strongpass",
+    )
+    return create_user(db_session,user_in)
