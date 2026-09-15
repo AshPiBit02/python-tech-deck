@@ -11,6 +11,13 @@ router=APIRouter(tags=["users"])
 def read_me(current_user:User=Depends(get_current_user)):
     return current_user
 
+@router.get("/admin/user",reponse_model=UserOut)
+def user_by_id(db:database_dependency,user_id:int,admin_user:User=Depends(require_admin)):
+    user=get_user_by_id(db,user_id)
+    if user is None:
+        raise HTTPException(status_code=404,detail=f"User with id {user_id} not found!")
+    return user
+
 @router.patch("/me")
 def update_me(db:database_dependency,body:UserUpdate,pin:str,current_user:User=Depends(get_current_user)):
     role_changed=body.role is not None and body.role!=current_user.role
