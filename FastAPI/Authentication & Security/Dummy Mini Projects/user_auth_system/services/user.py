@@ -3,7 +3,6 @@ from models.user import User,Role
 from schemas.user import UserRegistration,UserUpdate
 from core.security import hash_password
 from core.security import verify_admin_key
-from core.security import verify_pin
 
 def get_user_by_email(db:Session,email:str)->User|None:
     return db.query(User).filter(User.email==email).first()
@@ -29,11 +28,10 @@ def create_user(db:Session,user_in:UserRegistration)->User:
     db.refresh(db_user)
     return db_user
 
-def update_user(db:Session,user_id:int,user_in:UserUpdate,pin:str)->User:
+def update_user(db:Session,user_id:int,user_in:UserUpdate)->User:
     db_user=get_user_by_id(db,user_id)
     if not db_user:
         return None
-    verify_pin(pin)
     update_data=user_in.model_dump(exclude_unset=True)
     for key,value in update_data.items():
         if key=="role":
@@ -48,9 +46,8 @@ def update_user(db:Session,user_id:int,user_in:UserUpdate,pin:str)->User:
     db.refresh(db_user)
     return db_user
 
-def delete_user(db:Session,user_id:int,pin:str)->dict:
+def delete_user(db:Session,user_id:int)->dict:
     db_user=get_user_by_id(db,user_id)
-    verify_pin(pin)
     if not db_user:
         return None
     db.delete(db_user)

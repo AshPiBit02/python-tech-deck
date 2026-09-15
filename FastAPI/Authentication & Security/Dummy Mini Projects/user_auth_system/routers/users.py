@@ -3,7 +3,7 @@ from dependencies.db_dependency import database_dependency
 from models import User
 from schemas.user import UserOut,UserUpdate
 from services.user import get_all_users,get_user_by_id,update_user,delete_user
-from dependencies.auth import get_current_user,require_admin
+from dependencies.auth import get_current_user,require_admin,require_pin
 
 router=APIRouter(tags=["users"])
 
@@ -19,7 +19,7 @@ def user_by_id(db:database_dependency,user_id:int,admin_user:User=Depends(requir
     return user
 
 @router.patch("/me")
-def update_me(db:database_dependency,body:UserUpdate,pin:str,current_user:User=Depends(get_current_user)):
+def update_me(db:database_dependency,body:UserUpdate,pin:str=Depends(require_pin),current_user:User=Depends(get_current_user)):
     role_changed=body.role is not None and body.role!=current_user.role
     updated_user=update_user(db,current_user.id,body,pin)
     response=UserOut.model_validate(updated_user).model_dump()
@@ -32,7 +32,7 @@ def list_users(db:database_dependency,admin_user:User=Depends(require_admin)):
     return get_all_users(db)
 
 @router.delete("/admin/users/{user_id}")
-def remove_user(db:database_dependency,user_id:int,pin:str,admin_user:User=Depends(require_admin)):
+def remove_user(db:database_dependency,user_id:int,pin:str=Depends(require_pin),admin_user:User=Depends(require_admin)):
     deleted=delete_user(db,user_id,pin)
     if not deleted:
         raise HTTPException(status_code=404,detail="User not found")
