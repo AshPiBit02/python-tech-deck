@@ -36,6 +36,6 @@ def test_login_token_has_correct_claims(client,registered_user):
     access_token=reponse.json()["access_token"]
     payload=jwt.decode(access_token,settings.secret_key,algorithms=[settings.algorithm])
 
-    assert payload["type"]=="bearer"
+    assert payload["type"]=="access"
     assert payload["sub"]==str(registered_user.id)
     assert payload["role"]=="User"
