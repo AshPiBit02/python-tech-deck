@@ -10,7 +10,7 @@ def test_register_success(client):
     body=response.json()
     assert body["email"]=="dummy@gmail.com"
     assert body["role"]=="User"
-    assert body["hashed_password"] not in body
+    assert "hashed_password" not in body
 
 def test_register_duplicate_email(client):
     payload={
@@ -21,7 +21,7 @@ def test_register_duplicate_email(client):
     client.post("/register",json=payload)
     response=client.post("/register",json=payload)
     assert response.status_code==400
-    assert "already registerd" in response.json()["detail"]
+    assert "already registered" in response.json()["detail"]
 
 def test_register_password_mismatch(client):
     response=client.post("/register",json={
