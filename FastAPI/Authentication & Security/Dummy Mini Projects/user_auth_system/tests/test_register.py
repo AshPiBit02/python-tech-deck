@@ -23,3 +23,19 @@ def test_register_duplicate_email(client):
     assert response.status_code==400
     assert "already registerd" in response.json()["detail"]
 
+def test_register_password_mismatch(client):
+    response=client.post("/register",json={
+        "email":"aegon@gmail.com",
+        "password":"aegonTheV",
+        "confirm_password":"jonSnowNoV",
+    })
+    assert response.status_code==400
+    assert "do not match" in response.json()["detail"]
+
+def test_register_weak_password(client):
+    response=client.post("/register",json={
+        "email":"eddar@gmail.com",
+        "password":"ned",
+        "confirm_password":"ned",
+    })
+    assert response.status_code==422
