@@ -6,7 +6,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from fastapi.testclient import TestClient
 
-from core.config import settings
+from user_auth_system.core.config import settings
 from db.database import Base,get_db
 from models.user import User
 from models.refresh_token import RefreshToken

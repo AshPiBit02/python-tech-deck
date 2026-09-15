@@ -1,4 +1,4 @@
-def test_login_success(client,registerd_user):
+def test_login_success(client,registered_user):
     response=client.post("/token",data={
         "username":"testuser@gmail.com",
         "password":"strongpass",
