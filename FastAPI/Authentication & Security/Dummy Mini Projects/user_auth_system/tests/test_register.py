@@ -59,4 +59,13 @@ def test_register_admin_with_wrong_key(client):
     })
     assert response.status_code==403
 
-
+def test_register_admin_with_correct_key(client):
+    response=client.post("/register",json={
+        "email":"genuineadmin@gmail.com",
+        "password":"validpassword",
+        "confirm_password":"validpassword",
+        "role":"Admin",
+        "admin_secret_key":settings.admin_secret_key,
+    })
+    assert response.status_code==200
+    assert response.json()["role"]=="Admin"
