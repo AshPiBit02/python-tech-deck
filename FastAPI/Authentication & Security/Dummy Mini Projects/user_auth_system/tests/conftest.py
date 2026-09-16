@@ -54,3 +54,12 @@ def registered_user(db_session):
         confirm_password="strongpass",
     )
     return create_user(db_session,user_in)
+
+@pytest.fixture
+def auth_headers(client,registered_user):
+    response=client.post("/token",data={
+        "username":registered_user.email,
+        "password":"strongpass",
+    })
+    token=response.json()["access_token"]
+    return {"Authorization":f"Bearer {token}"}
