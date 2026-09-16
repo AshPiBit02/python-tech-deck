@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 
 from user_auth_system.core.config import settings
 from db.database import Base,get_db
-from models.user import User
+from models.user import User,Role
 from models.refresh_token import RefreshToken
 from  main import app
 from services.user import create_user
@@ -65,3 +65,23 @@ def auth_headers(client,registered_user):
     return {"Authorization":f"Bearer {token}",
             "pin":settings.pin,
             }
+
+@pytest.fixture
+def admin_user(db_session):
+    user_in=UserRegistration(
+        email="adminuser@gmail.com",
+        password="strongpass",
+        confirm_password="strongpass",
+        role=Role.admin,
+        admin_secret_key=settings.admin_secret_key,
+    )
+    return create_user(db_session,user_in)
+
+@pytest.fixture
+def admin_headers(client,admin_user):
+    response=client.post("/token",data={
+        "username":"adminuser@gmail.com",
+        "password":"strongpass",
+    })
+    token=response.json()["access_token"]
+    return {"Authorization":f"Bearer {token}","pin":settings.pin}
