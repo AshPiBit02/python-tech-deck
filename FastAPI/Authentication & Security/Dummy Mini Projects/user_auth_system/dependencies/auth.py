@@ -5,6 +5,8 @@ from models.user import User,Role
 from services.user import get_user_by_id
 from core.security import decode_access_token
 from dependencies.db_dependency import database_dependency
+from fastapi import Header
+from core.security import verify_pin
 
 oauth2_scheme=OAuth2PasswordBearer(tokenUrl="token")
 
@@ -23,6 +25,6 @@ def require_admin(current_user:User=Depends(get_current_user))->User:
         raise HTTPException(status_code=403,detail="Access Denied")
     return current_user
 
-
-
-
+def require_pin(pin:str=Header(...))->None:
+    verify_pin(pin)
+    return None
