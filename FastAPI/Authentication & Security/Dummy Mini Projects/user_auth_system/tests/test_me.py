@@ -13,4 +13,12 @@ def test_get_me_invalid_token(client):
     response=client.get("/me",headers={"Authorization":"Bearer garbage.token.value"})
     assert response.status_code==401
 
+def test_update_me_email(client,auth_headers):
+    response=client.patch("/me",headers=auth_headers,json={"email":"newemail@gmail.com"})
+    assert response.status_code==200
+    assert response.json()["email"]=="newemail@gmail.com"
+
+def test_update_me_password(client,auth_headers,registered_user,db_session):
+    response=client.patch("/me",headers=auth_headers,json={"password":"newstrongpass123"})
+    assert response.status_code==200
 
