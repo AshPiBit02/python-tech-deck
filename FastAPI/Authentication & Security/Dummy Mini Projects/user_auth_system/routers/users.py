@@ -11,7 +11,7 @@ router=APIRouter(tags=["users"])
 def read_me(current_user:User=Depends(get_current_user)):
     return current_user
 
-@router.get("/admin/user",reponse_model=UserOut)
+@router.get("/admin/user",response_model=UserOut)
 def user_by_id(db:database_dependency,user_id:int,admin_user:User=Depends(require_admin)):
     user=get_user_by_id(db,user_id)
     if user is None:
@@ -19,9 +19,9 @@ def user_by_id(db:database_dependency,user_id:int,admin_user:User=Depends(requir
     return user
 
 @router.patch("/me")
-def update_me(db:database_dependency,body:UserUpdate,pin:str=Depends(require_pin),current_user:User=Depends(get_current_user)):
+def update_me(db:database_dependency,body:UserUpdate,current_user:User=Depends(get_current_user),pin:str=Depends(require_pin)):
     role_changed=body.role is not None and body.role!=current_user.role
-    updated_user=update_user(db,current_user.id,body,pin)
+    updated_user=update_user(db,current_user.id,body)
     response=UserOut.model_validate(updated_user).model_dump()
     if role_changed:
         response["notice"]="Role updated. Please log in again to receive a token with new role."
@@ -32,8 +32,8 @@ def list_users(db:database_dependency,admin_user:User=Depends(require_admin)):
     return get_all_users(db)
 
 @router.delete("/admin/users/{user_id}")
-def remove_user(db:database_dependency,user_id:int,pin:str=Depends(require_pin),admin_user:User=Depends(require_admin)):
-    deleted=delete_user(db,user_id,pin)
+def remove_user(db:database_dependency,user_id:int,admin_user:User=Depends(require_admin),pin:str=Depends(require_pin)):
+    deleted=delete_user(db,user_id)
     if not deleted:
         raise HTTPException(status_code=404,detail="User not found")
     return deleted

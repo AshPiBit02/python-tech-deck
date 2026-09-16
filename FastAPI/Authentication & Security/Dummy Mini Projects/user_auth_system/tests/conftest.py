@@ -62,4 +62,6 @@ def auth_headers(client,registered_user):
         "password":"strongpass",
     })
     token=response.json()["access_token"]
-    return {"Authorization":f"Bearer {token}"}
+    return {"Authorization":f"Bearer {token}",
+            "pin":settings.pin,
+            }

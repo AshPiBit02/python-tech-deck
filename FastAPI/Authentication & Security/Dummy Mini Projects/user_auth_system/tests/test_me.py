@@ -15,6 +15,7 @@ def test_get_me_invalid_token(client):
 
 def test_update_me_email(client,auth_headers):
     response=client.patch("/me",headers=auth_headers,json={"email":"newemail@gmail.com"})
+    print(response.json())
     assert response.status_code==200
     assert response.json()["email"]=="newemail@gmail.com"
 
