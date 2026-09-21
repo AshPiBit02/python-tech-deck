@@ -63,5 +63,23 @@ async def get_weather_sequential(backgound_tasks:BackgroundTasks,cities:list[str
         "results":results
         }
 
+@app.get("/weather/concurrenty")
+async def get_weather_concurrent(background_tasks:BackgroundTasks,cities:list[str]=Query(...,description="e.g. ?cities=London&cities=Paris&cities=Tokyo")):
+    start=time.perf_counter()
+    async with httpx.AsyncClient() as client:
+        results=await asyncio.gather(*[fetch_weather(client,city) for city in cities])
+
+    for result in results:
+        background_tasks.add_task(log_request,result["city"],result["duration_seconds"],result["success"])
+
+    total_time=time.perf_counter()-start
+    return {
+        "mode":"concurrent",
+        "total_time_seconds":round(total_time,3),
+        "results":list(results)
+    }
 
 
+@app.get("/logs")
+def get_logs():
+    return {"count":len(REQUEST_LOGS),"logs":REQUEST_LOGS}
