@@ -35,3 +35,15 @@ async def fetch_fun_fact(client:httpx.AsyncClient)->dict:
         "source":"fun_fact",
         "fact":data["fact"],
     }
+
+async def fetch_city_weather(client:httpx.AsyncClient,city:str)->dict:
+    response=await client.get("https://wttr.in/{city}?format=j1",timeout=10)
+    response.raise_for_status()
+    data=response.json()
+    current=data["current_condition"][0]
+    return {
+        "source":"weather",
+        "city":city,
+        "temperature_C":current["temp_C"],
+        "description":current["weatherDesc"][0]["value"],
+    }
