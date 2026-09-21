@@ -59,7 +59,7 @@ async def get_dashboard(backgound_tasks:BackgroundTasks,city:str=Query("Berlin")
             return_exceptions=True,
         )
 
-    dashboard=[]
+    dashboard={}
     successed=[]
     failed=[]
 
