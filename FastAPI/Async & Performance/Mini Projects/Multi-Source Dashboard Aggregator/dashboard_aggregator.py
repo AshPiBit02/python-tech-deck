@@ -81,3 +81,10 @@ async def get_dashboard(backgound_tasks:BackgroundTasks,city:str=Query("Berlin")
         "sources_failed":failed,
         "dashboard":dashboard,
     }
+
+@app.get("/logs")
+def get_logs():
+    return {
+        "count":len(REQUEST_LOGS),
+        "logs":REQUEST_LOGS,
+    }
