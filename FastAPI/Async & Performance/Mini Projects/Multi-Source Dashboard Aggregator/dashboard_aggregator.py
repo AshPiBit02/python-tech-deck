@@ -16,3 +16,13 @@ def log_dashboard_request(sources_succeeded:list[str],sources_failed:list[str],t
         "total_time_seconds":round(total_time,3),
         "timestamp":datetime.now(timezone.utc).isoformat(),
     })
+
+async def fetch_quote(client:httpx.AsyncClient)->dict:
+    response=await client.get("https://api.quotable.io/random",timeout=30)
+    response.raise_for_status()
+    data=response.json()
+    return {
+        "source":"quote",
+        "content":data["content"],
+        "author":data["author"],
+    }
