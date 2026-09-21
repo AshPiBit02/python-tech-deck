@@ -47,3 +47,37 @@ async def fetch_city_weather(client:httpx.AsyncClient,city:str)->dict:
         "temperature_C":current["temp_C"],
         "description":current["weatherDesc"][0]["value"],
     }
+
+@app.get("/dashboard")
+async def get_dashboard(backgound_tasks:BackgroundTasks,city:str=Query("Berlin")):
+    start=time.perf_counter()
+    async with httpx.AsyncClient() as client:
+        results= await asyncio.gather(
+            fetch_quote(client),
+            fetch_fun_fact(client),
+            fetch_city_weather(client,city),
+            return_exceptions=True,
+        )
+
+    dashboard=[]
+    successed=[]
+    failed=[]
+
+    source_names=["quote","fun_fact","weather"]
+    for name,result in zip(source_names,results):
+        if isinstance(result,Exception):
+            dashboard[name]={"error":str(result)}
+            failed.append(name)
+        else:
+            dashboard[name]=result
+            successed.append(name)
+
+    total_time=time.perf_counter()-start
+    backgound_tasks.add_task(log_dashboard_request,successed,failed,total_time)
+
+    return {
+        "total_time_seconds":round(total_time,3),
+        "sources_succeeded":successed,
+        "sources_failed":failed,
+        "dashboard":dashboard,
+    }
