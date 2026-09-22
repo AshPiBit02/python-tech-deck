@@ -42,3 +42,24 @@ async def process_single_image(job_id:str,filename:str,source_path:Path):
     if all(s in ("done","failed") for s in statuses):
         JOBS[job_id]["status"]="compleleted"
         JOBS[job_id]["completed_at"]=datetime.now(timezone.utc).isoformat()
+
+@app.post("/batch_upload")
+async def batch_upload(background_tasks:BackgroundTasks,files:list[UploadFile]=File(...)):
+    job_id=str(uuid.uuid4())
+    JOBS[job_id]={
+        "status":"processing",
+        "created_at":datetime.now(timezone.utc).isoformat(),
+        "files":{},
+    }
+    for upload in files:
+        contents=await upload.read()
+        source_path = UPLOAD_DIR/upload.filename
+        with open(source_path,"wb") as f:
+            f.write(contents)
+
+        JOBS[job_id]["files"][upload.filename]={"status":"queued"}
+
+        background_tasks.add_task(process_single_image,job_id,upload.filename,source_path)
+
+    return {"job_id":job_id,"file_count":len(files),"status":"processing"}
+
