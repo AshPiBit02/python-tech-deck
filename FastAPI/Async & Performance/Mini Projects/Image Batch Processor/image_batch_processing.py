@@ -63,3 +63,9 @@ async def batch_upload(background_tasks:BackgroundTasks,files:list[UploadFile]=F
 
     return {"job_id":job_id,"file_count":len(files),"status":"processing"}
 
+@app.get("/batch-status/{job_id}")
+def get_batch_status(job_id:str):
+    job=JOBS.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404,detail="Job not found")
+    return job
