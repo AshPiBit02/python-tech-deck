@@ -4,7 +4,7 @@ import time
 import uuid
 from datetime import datetime,timezone
 from pathlib import Path
-from typing import List,Annotated
+
 from fastapi import FastAPI,UploadFile,File,BackgroundTasks,HTTPException
 from PIL import Image
 
@@ -27,38 +27,42 @@ def resize_image_cpu_bound(source_path:Path,dest_path:Path)->dict:
     elapsed=time.perf_counter()-start
     return {"duration_seconds":round(elapsed,3),"thumbnail_path":str(dest_path)}
 
-async def process_single_image(job_id:str,filename:str,source_path:Path):
-    dest_path=THUMBNAIL_DIR/f"thumb_{filename}"
-    loop=asyncio.get_event_loop()
+async def process_single_image(job_id: str, filename: str, source_path: Path):
+    dest_path = THUMBNAIL_DIR / f"thumb_{filename}"
+    loop = asyncio.get_event_loop()
 
     try:
-        result=await loop.run_in_executor(None,resize_image_cpu_bound,source_path,dest_path)
-        JOBS[job_id]["files"][filename]={"status":"done",**result}
-
+        result = await loop.run_in_executor(None, resize_image_cpu_bound, source_path, dest_path)
+        JOBS[job_id]["files"][filename].update({"status": "done", **result})
+        print(f"Thumbnail created for {filename}")
     except Exception as e:
-        JOBS[job_id]["files"][filename]={"status":"failed","error":str(e)}
+        JOBS[job_id]["files"][filename].update({"status": "failed", "error": str(e)})
+        print(f"Failed to process {filename}: {e}")
 
-    statuses=[f["status"] for f in JOBS[job_id]["files"].values()]
-    if all(s in ("done","failed") for s in statuses):
-        JOBS[job_id]["status"]="compleleted"
-        JOBS[job_id]["completed_at"]=datetime.now(timezone.utc).isoformat()
+    statuses = [f["status"] for f in JOBS[job_id]["files"].values()]
+    if all(s in ("done", "failed") for s in statuses):
+        JOBS[job_id]["status"] = "completed"
+        JOBS[job_id]["completed_at"] = datetime.now(timezone.utc).isoformat()
 
-@app.post("/batch_upload")
-async def batch_upload(background_tasks:BackgroundTasks,file:UploadFile=File(...)):
+@app.post("/batch-upload")
+async def batch_upload(background_tasks:BackgroundTasks,files:list[UploadFile]=File(...)):
     job_id=str(uuid.uuid4())
     JOBS[job_id]={
         "status":"processing",
         "created_at":datetime.now(timezone.utc).isoformat(),
         "files":{},
     }
-    contents=await file.read()
-    source_path = UPLOAD_DIR/file.filename
-    with open(source_path,"wb") as f:
-        f.write(contents)
-    JOBS[job_id]["files"][file.filename]={"status":"queued"}
-    background_tasks.add_task(process_single_image,job_id,file.filename,source_path)
+    for upload in files:
+        contents=await upload.read()
+        source_path = UPLOAD_DIR/upload.filename
+        with open(source_path,"wb") as f:
+            f.write(contents)
 
-    return {"job_id":job_id,"status":"processing"}
+        JOBS[job_id]["files"][upload.filename]={"status":"queued"}
+
+        background_tasks.add_task(process_single_image,job_id,upload.filename,source_path)
+
+    return {"job_id":job_id,"file_count":len(files),"status":"processing"}
 
 @app.get("/batch-status/{job_id}")
 def get_batch_status(job_id:str):
