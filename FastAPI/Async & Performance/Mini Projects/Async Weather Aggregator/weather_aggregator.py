@@ -63,7 +63,7 @@ async def get_weather_sequential(backgound_tasks:BackgroundTasks,cities:list[str
         "results":results
         }
 
-@app.get("/weather/concurrenty")
+@app.get("/weather/concurrent")
 async def get_weather_concurrent(background_tasks:BackgroundTasks,cities:list[str]=Query(...,description="e.g. ?cities=London&cities=Paris&cities=Tokyo")):
     start=time.perf_counter()
     async with httpx.AsyncClient() as client:
