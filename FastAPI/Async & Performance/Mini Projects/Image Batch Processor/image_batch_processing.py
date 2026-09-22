@@ -4,7 +4,7 @@ import time
 import uuid
 from datetime import datetime,timezone
 from pathlib import Path
-
+from typing import List,Annotated
 from fastapi import FastAPI,UploadFile,File,BackgroundTasks,HTTPException
 from PIL import Image
 
@@ -44,7 +44,7 @@ async def process_single_image(job_id:str,filename:str,source_path:Path):
         JOBS[job_id]["completed_at"]=datetime.now(timezone.utc).isoformat()
 
 @app.post("/batch_upload")
-async def batch_upload(background_tasks:BackgroundTasks,files:list[UploadFile]=File(...)):
+async def batch_upload(background_tasks:BackgroundTasks,files:Annotated[List[UploadFile],File(...)]):
     job_id=str(uuid.uuid4())
     JOBS[job_id]={
         "status":"processing",
