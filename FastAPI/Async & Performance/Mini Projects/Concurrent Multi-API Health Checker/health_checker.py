@@ -32,3 +32,19 @@ async def check_one(client:httpx.AsyncClient,name:str,url:str)->dict:
             "error":str(e),
             "response_time_seconds":round(elapsed,3),
         }
+
+@app.get("/health/dependencies")
+async def check_dependencies():
+    start=time.perf_counter()
+    async with httpx.AsyncClient as client:
+        results=await asyncio.gather(*[
+            check_one(client,name,url) for name,url in DEPENDENCIES.items()
+        ])
+    total_time=time.perf_counter()-start
+    overall_status="healthy" if all(r["status"]=="up" for r in results) else "degraded"
+    return {
+        "overall_status":overall_status,
+        "checked_at":datetime.now(timezone.utc).isoformat(),
+        "total_check_time_seconds":round(total_time,3),
+        "depedencies":results,
+    }
