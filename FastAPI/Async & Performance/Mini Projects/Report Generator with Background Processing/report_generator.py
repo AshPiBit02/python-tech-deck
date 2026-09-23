@@ -5,8 +5,9 @@ from fastapi import FastAPI,BackgroundTasks,HTTPException
 
 app=FastAPI(title="Report Generator")
 
+CATEGORIES=["food","travel","bills"]
 FAKE_TRANSACTIONS=[
-    {"user_id":i%50,"amount":round((i*37.5)%500,2),"category":["food","travel","bills"][i%3]}
+    {"user_id":i%50,"amount":round((i*37.5)%500,2),"category":CATEGORIES[i%3]}
     for i in range(200_000)
 ]
 
@@ -37,6 +38,8 @@ def generate_report(report_id:str,category_filter:str|None):
 
 @app.post("/reports")
 def request_report(background_tasks:BackgroundTasks,category:str|None=None):
+    if category not in CATEGORIES:
+        raise HTTPException(status_code=400,detail="No such category exists!")
     report_id=str(uuid.uuid4())
     REPORTS[report_id]={
         "status":"processing",
