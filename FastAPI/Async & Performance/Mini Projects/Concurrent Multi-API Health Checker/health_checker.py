@@ -36,7 +36,7 @@ async def check_one(client:httpx.AsyncClient,name:str,url:str)->dict:
 @app.get("/health/dependencies")
 async def check_dependencies():
     start=time.perf_counter()
-    async with httpx.AsyncClient as client:
+    async with httpx.AsyncClient() as client:
         results=await asyncio.gather(*[
             check_one(client,name,url) for name,url in DEPENDENCIES.items()
         ])
