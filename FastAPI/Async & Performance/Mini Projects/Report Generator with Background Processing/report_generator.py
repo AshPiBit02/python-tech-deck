@@ -6,7 +6,7 @@ from fastapi import FastAPI,BackgroundTasks,HTTPException
 app=FastAPI(title="Report Generator")
 
 FAKE_TRANSACTIONS=[
-    {"user_id":i%50,"amount":round((i*37.5)%500,2),"category":["flood","travel","bills"][i%3]}
+    {"user_id":i%50,"amount":round((i*37.5)%500,2),"category":["food","travel","bills"][i%3]}
     for i in range(200_000)
 ]
 
