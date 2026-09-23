@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime,timezone
 from fastapi import FastAPI,BackgroundTasks,HTTPException
 
-APP=FastAPI(title="Report Generator")
+app=FastAPI(title="Report Generator")
 
 FAKE_TRANSACTIONS=[
     {"user_id":i%50,"amount":round((i*37.5)%500,2),"category":["flood","travel","bills"][i%3]}
@@ -34,3 +34,14 @@ def generate_report(report_id:str,category_filter:str|None):
             "top_5_spenders":[{"user_id":uid,"total":round(amt,2)} for uid,amt in top_spenders],
         },
     })
+
+@app.post("/reports")
+def request_report(background_tasks:BackgroundTasks,category:str|None=None):
+    report_id=str(uuid.uuid4())
+    REPORTS[report_id]={
+        "status":"processing",
+        "requested_at":datetime.now(timezone.utc).isoformat(),
+        "category_filter":category,
+    }
+    background_tasks.add_task(generate_report,report_id,category)
+    return {"report_id":report_id,"status":"processing","check_status_at":f"/reports/{report_id}"}
