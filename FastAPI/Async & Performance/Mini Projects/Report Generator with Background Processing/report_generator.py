@@ -45,3 +45,10 @@ def request_report(background_tasks:BackgroundTasks,category:str|None=None):
     }
     background_tasks.add_task(generate_report,report_id,category)
     return {"report_id":report_id,"status":"processing","check_status_at":f"/reports/{report_id}"}
+
+@app.get("/reports/{report_id}")
+def get_report_status(report_id:str):
+    report=REPORTS.get(report_id)
+    if not report:
+        raise HTTPException(status_code=404,detail="Report not found")
+    return report
