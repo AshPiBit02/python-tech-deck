@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+import time
 
 app=FastAPI()
 
@@ -22,10 +23,22 @@ async def count_requests(request,call_next):
     return response
 
 """
+"""
 @app.middleware("http")
 async def print_route_info(request,call_next):
     print(f"Someone requested: Method:{request.method} | Path:{request.url.path}")
     response = await call_next(request)
+    return response
+"""
+
+@app.middleware("http")
+async def show_timing(request,call_next):
+    start_time=time.time()
+
+    response=await call_next(request)
+
+    duration=time.time()-start_time
+    print(f"That request took {duration:.4f}s")
     return response
 
 @app.get("/")
