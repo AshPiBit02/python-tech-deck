@@ -48,3 +48,9 @@ def home():
 @app.get("/about")
 def about():
     return {"message":"This is for basic demonstration"}
+
+@app.get("/slow")
+async def slow_route():
+    import asyncio
+    await asyncio.sleep(2)
+    return{"message":"done"}
