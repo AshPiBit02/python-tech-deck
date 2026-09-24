@@ -2,7 +2,6 @@ from fastapi import FastAPI
 
 app=FastAPI()
 
-request_count=0
 
 """
 @app.middleware("http")
@@ -12,6 +11,8 @@ async def say_hello(request,call_next):
     print("A response is about to be sent back!")
     return response
 """
+"""
+request_count=0
 @app.middleware("http")
 async def count_requests(request,call_next):
     global request_count
@@ -19,7 +20,14 @@ async def count_requests(request,call_next):
     print(f"This is request number {request_count}")
     response=await call_next(request)
     return response
-    
+
+"""
+@app.middleware("http")
+async def print_route_info(request,call_next):
+    print(f"Someone requested: Method:{request.method} | Path:{request.url.path}")
+    response = await call_next(request)
+    return response
+
 @app.get("/")
 def home():
     return {"message":"Halo boss"}
