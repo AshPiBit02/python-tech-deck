@@ -23,3 +23,21 @@ def get_product_v1(product_id:int):
         raise HTTPException(status_code=404,detail="Product not found!")
     return {"id":product_id,"name":p["name"],"price":p["price"]}
 
+v2=APIRouter(prefix="/v2/products",tags=["v2"])
+
+@v2.get("/{product_id}")
+def get_product_v2(product_id:int):
+    p=PRODUCTS[product_id]
+    if p is None:
+        raise HTTPException(status_code=404,detail="Product not found!")
+    return {
+        "id":product_id,
+        "name":p["name"],
+        "cost":{
+            "amount":p["price"],
+            "currency":"USD"
+        },
+    }
+
+app.include_router(v1)
+app.include_router(v2)
