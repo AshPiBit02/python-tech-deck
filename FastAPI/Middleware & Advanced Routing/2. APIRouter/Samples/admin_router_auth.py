@@ -21,3 +21,20 @@ admin_router=APIRouter(
     dependencies=[Depends(verify_admin_token)],
 )
 
+@admin_router.get("/dashboard")
+def dashboard():
+    return {"active_users":863,"revenue_today":8692.36}
+
+@admin_router.get("/users")
+def list_all_users():
+    return [
+        {"id":1,"name":"banana"},
+        {"id":2,"name":"big tie"},
+        {"id":3,"name":"choyie"}
+    ]
+
+@admin_router.delete("/{user_id}")
+def delete_user(user_id:int):
+    return {"message":f"User with id {user_id} deleted."}
+
+app.include_router(admin_router)
