@@ -23,3 +23,14 @@ router=APIRouter(prefix="/profile")
 def read_profile(username:Annotated[str,Depends(get_current_username)]):
     return {"username":username,"profile_complete":True}
 
+test_app=FastAPI()
+test_app.include_router(router)
+
+test_app.dependency_overrides[get_current_username]=lambda:"fake-test-user"
+
+client=TestClient(test_app)
+
+def test_read_profile_uses_fake_user():
+    response=client.get("/profile/")
+    assert response.status_code==200
+    assert response.json()=={"username":"fake-test-user","profile_complete":True}
