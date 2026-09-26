@@ -26,7 +26,12 @@ def read_profile(username:Annotated[str,Depends(get_current_username)]):
 test_app=FastAPI()
 test_app.include_router(router)
 
-test_app.dependency_overrides[get_current_username]=lambda:"fake-test-user"
+# test_app.dependency_overrides[get_current_username]=lambda:"fake-test-user" ## Shorthand
+
+def get_fake_user():
+    return "fake-test-user"
+
+test_app.dependency_overrides[get_current_username]=get_fake_user
 
 client=TestClient(test_app)
 
