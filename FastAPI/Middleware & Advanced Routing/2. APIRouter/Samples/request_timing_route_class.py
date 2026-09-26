@@ -17,7 +17,7 @@ app=FastAPI(title="Custom APIRoute Timing Demo")
 
 class TimedRoute(APIRoute):
     def get_route_handler(self)->Callable:
-        original_handler=super().get_router_handler()
+        original_handler=super().get_route_handler()
 
         async def timed_handler(request:Request)->Response:
             request_id=str(uuid.uuid4())
@@ -32,3 +32,10 @@ class TimedRoute(APIRoute):
         
         return timed_handler
 
+orders_router=APIRouter(prefix="/orders",tags=["orders"],route_class=TimedRoute)
+
+@orders_router.get("/{order_id}")
+def get_order(order_id:int):
+    return {"order_id":order_id,"status":"shipped"}
+
+app.include_router(orders_router)
