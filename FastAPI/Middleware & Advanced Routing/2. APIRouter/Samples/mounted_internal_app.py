@@ -11,7 +11,7 @@ from fastapi import FastAPI,APIRouter
 
 app=FastAPI(title="Public Customer API")
 
-@app.get("/products",tags=["public"])
+@app.get("/products",tags=["Public"])
 def list_products():
     return [
         {"id":1,"item":"Laptop"},
@@ -19,3 +19,17 @@ def list_products():
         {"id":3,"item":"Jacket"},
     ]
 
+internal_app=FastAPI(title="Internal Ops API")
+interal_router=APIRouter(tags=["Internal"])
+
+@interal_router.get("/health")
+def health_check():
+    return {"status":"OK"}
+
+@interal_router.get("/db-pool-status")
+def db_pool_status():
+    return {"active":4,"idle":6,"max":10}
+
+internal_app.include_router(interal_router)
+
+app.mount("/internal",internal_app)
