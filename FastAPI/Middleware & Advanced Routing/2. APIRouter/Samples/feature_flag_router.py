@@ -10,15 +10,21 @@ in /docs.
 """
 
 import os
-from fastapi import FastAPI,HTTPException,APIRouter
+from fastapi import FastAPI,APIRouter
 
 app=FastAPI(title="Feature-Flagged Router Demo")
 
-FEATURE_BETA_ANALYTIC=os.getenv("FEATURE_BETA_ANALYSICS","false").lower()=="true"
+FEATURE_BETA_ANALYTICS=os.getenv("FEATURE_BETA_ANALYTICS","false").lower()=="true"
 
-analytics_routes=APIRouter(prefix="/anaytics",tags=["analytics"])
+analytics_routes=APIRouter(prefix="/analytics",tags=["analytics"])
 
 @analytics_routes.get("/summary")
 def stable_summary():
     return {"page_views":10596,"unique_visitors":935}
 
+if FEATURE_BETA_ANALYTICS:
+    @analytics_routes.get("/beta-summary")
+    def beta_summary():
+        return {"cohort_retention":0.45,"experimental":True}
+
+app.include_router(analytics_routes)
