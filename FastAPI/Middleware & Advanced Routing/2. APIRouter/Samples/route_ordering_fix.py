@@ -21,3 +21,16 @@ def get_user_buggy(user_id:int):
 @buggy_router.get("/me")
 def get_current_user_buggy():
     return {"user_id":277,"type":"Admin"}
+
+fixed_router=APIRouter(prefix="/fixed/users",tags=["Fixed"])
+
+@fixed_router.get("/me")
+def get_current_user_fixed():
+    return {"user_id":277,"type":"Admin"}
+
+@fixed_router.get("/{user_id}")
+def get_user_buggy(user_id:int):
+    return {"user_id":user_id,"type":"Naive"}
+
+app.include_router(buggy_router)
+app.include_router(fixed_router)
