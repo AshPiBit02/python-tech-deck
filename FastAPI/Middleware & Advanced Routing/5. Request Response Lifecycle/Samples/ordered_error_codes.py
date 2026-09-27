@@ -19,11 +19,7 @@ FAKE_TOKENS={
     "admin-token":{"username":"alita","role":"admin"},
 }
 
-def get_current_user(authorization: str=Header(None)):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401,detail="Invalid or expired token")
-
-    token=authorization.removeprefix("Bearer ").strip()
+def get_current_user(token: str=Header(None)):
     user=FAKE_TOKENS.get(token)
     if not user:
         raise HTTPException(status_code=401,detail="Invalid or expired token")
