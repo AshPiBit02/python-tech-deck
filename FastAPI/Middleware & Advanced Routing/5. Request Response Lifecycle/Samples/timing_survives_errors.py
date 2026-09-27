@@ -24,13 +24,16 @@ async def timing_middlware(request,call_next):
     return response
 
 @app.get("/success")
-def success_route():
+async def success_route():
+    asyncio.sleep(random.uniform(0.84,2.34))
     return {"message":"all good"}
 
 @app.get("/handled-error")
-def handled_error_route():
+async def handled_error_route():
+    asyncio.sleep(random.uniform(0.84,2.34))
     raise HTTPException(status_code=404,detail="Timing not found")
 
 @app.get("/crash")
-def crash_route():
+async def crash_route():
+    asyncio.sleep(random.uniform(0.84,2.34))
     return 1/0 # deliberate unhandled bug
