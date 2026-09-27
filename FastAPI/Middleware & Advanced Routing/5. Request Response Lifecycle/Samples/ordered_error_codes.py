@@ -35,3 +35,6 @@ def require_admin(current_user:dict=Depends(get_current_user)):
         raise HTTPException(status_code=403,detail="Access Denied")
     return current_user
 
+@app.get("/admin/dashboard")
+def admin_dashboard(admin_user:dict=Depends(require_admin)):
+    return {"message":f"Welcome, {admin_user['username']}"}
