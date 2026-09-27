@@ -25,4 +25,6 @@ def get_fake_db():
     yield {"notes":["Buy groceries","Call Jhonny: The plumber"]}
     print("Closing the (fake) DB connection...")
 
-
+@app.get("/notes")
+def read_notes(db:dict=Depends(get_fake_db)):
+    return {"notes":db["notes"]}
