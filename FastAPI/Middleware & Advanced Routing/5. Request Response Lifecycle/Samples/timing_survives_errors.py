@@ -10,7 +10,7 @@ response object.
 
 import time
 import asyncio
-from random import random
+import random
 from fastapi import FastAPI,HTTPException
 
 app=FastAPI(title="Timing Survives Errors Demo")
@@ -25,15 +25,15 @@ async def timing_middlware(request,call_next):
 
 @app.get("/success")
 async def success_route():
-    asyncio.sleep(random.uniform(0.84,2.34))
+    await asyncio.sleep(random.uniform(0.84,2.34))
     return {"message":"all good"}
 
 @app.get("/handled-error")
 async def handled_error_route():
-    asyncio.sleep(random.uniform(0.84,2.34))
+    await asyncio.sleep(random.uniform(0.84,2.34))
     raise HTTPException(status_code=404,detail="Timing not found")
 
 @app.get("/crash")
 async def crash_route():
-    asyncio.sleep(random.uniform(0.84,2.34))
+    await asyncio.sleep(random.uniform(0.84,2.34))
     return 1/0 # deliberate unhandled bug
