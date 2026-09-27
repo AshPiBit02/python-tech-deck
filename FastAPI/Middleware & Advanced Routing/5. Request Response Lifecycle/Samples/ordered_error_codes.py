@@ -30,3 +30,8 @@ def get_current_user(authorization: str=Header(None)):
 
     return user
 
+def require_admin(current_user:dict=Depends(get_current_user)):
+    if current_user["role"]!="admin":
+        raise HTTPException(status_code=403,detail="Access Denied")
+    return current_user
+
