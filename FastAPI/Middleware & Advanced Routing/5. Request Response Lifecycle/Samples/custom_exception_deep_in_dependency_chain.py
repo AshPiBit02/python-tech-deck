@@ -15,8 +15,10 @@ import uuid
 app=FastAPI(title="Custom Exception Deep in Dependency Chain")
 
 FAKE_STOCK={
-    "in-stock-item":5,
-    "sold-out-item":0,
+    "common-item":23,
+    "latest-item":16,
+    "expensive-item":9,
+    "rare-item":3,
 }
 
 class OutOfStockError(Exception):
@@ -46,11 +48,11 @@ async def handle_out_of_stock(request:Request,exc:OutOfStockError):
         content={"detail":f"Product '{exc.product_id}' is out of stock"},
     )
 
-@app.post("/checkout")
-def checkout(order:CheckOutResponse=Depends(validate_cart))->OrderResponse:
+@app.post("/checkout",response_model=OrderResponse)
+def checkout(order:CheckOutResponse=Depends(validate_cart)):
     return_order={
-        "order_id":uuid.uuid4(),
+        "order_id":str(uuid.uuid4()),
         "product_id":order.product_id,
         "updated_stock":FAKE_STOCK[order.product_id]
     }
-    return OrderResponse(**return_order)
+    return return_order
