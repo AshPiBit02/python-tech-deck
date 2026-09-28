@@ -39,3 +39,6 @@ async def handle_out_of_stock(request:Request,exc:OutOfStockError):
         content={"detail":f"Product '{exc.product_id}' is out of stock"},
     )
 
+@app.post("/checkout")
+def checkout(order:CheckOutResponse=Depends(validate_cart)):
+    return {"message":f"Order placed for {order.product_id}"}
