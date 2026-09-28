@@ -11,7 +11,7 @@ deep the exception was actually raised.
 from fastapi import FastAPI,Depends,Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-
+import uuid
 app=FastAPI(title="Custom Exception Deep in Dependency Chain")
 
 FAKE_STOCK={
@@ -27,6 +27,7 @@ class CheckOutResponse(BaseModel):
     product_id:str
 
 class OrderResponse(BaseModel):
+    order_id:str
     product_id:str
     updated_stock:int
 
@@ -48,6 +49,7 @@ async def handle_out_of_stock(request:Request,exc:OutOfStockError):
 @app.post("/checkout")
 def checkout(order:CheckOutResponse=Depends(validate_cart))->OrderResponse:
     return_order={
+        "order_id":uuid.uuid4(),
         "product_id":order.product_id,
         "updated_stock":FAKE_STOCK[order.product_id]
     }
