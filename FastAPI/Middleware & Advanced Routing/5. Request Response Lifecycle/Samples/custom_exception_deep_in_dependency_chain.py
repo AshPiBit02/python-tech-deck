@@ -26,12 +26,17 @@ class OutOfStockError(Exception):
 class CheckOutResponse(BaseModel):
     product_id:str
 
+class OrderResponse(BaseModel):
+    product_id:str
+    updated_stock:int
+
 def validate_cart(order:CheckOutResponse)->CheckOutResponse:
     stock=FAKE_STOCK.get(order.product_id,0)
     if stock==0:
         raise OutOfStockError(order.product_id)
     FAKE_STOCK[order.product_id]=stock-1
     return order
+
 
 @app.exception_handler(OutOfStockError)
 async def handle_out_of_stock(request:Request,exc:OutOfStockError):
@@ -41,5 +46,9 @@ async def handle_out_of_stock(request:Request,exc:OutOfStockError):
     )
 
 @app.post("/checkout")
-def checkout(order:CheckOutResponse=Depends(validate_cart)):
-    return {"message":f"Order placed for {order.product_id}"}
+def checkout(order:CheckOutResponse=Depends(validate_cart))->OrderResponse:
+    return_order={
+        "product_id":order.product_id,
+        "updated_stock":FAKE_STOCK[order.product_id]
+    }
+    return OrderResponse(**return_order)
