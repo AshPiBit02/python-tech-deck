@@ -9,7 +9,7 @@ non-deprecated replacement for @app.on_event), and reuse it across every request
 
 from contextlib import asynccontextmanager
 import httpx
-from fastapi import FastAPI
+from fastapi import FastAPI,HTTPException
 
 @asynccontextmanager
 async def lifespan(app:FastAPI):
@@ -25,7 +25,13 @@ app=FastAPI(lifespan=lifespan)
 
 @app.get("/quote")
 async def get_quote():
-    response=await app.state.http_client.get("https://api.quotable.io/random")
-    response.raise_for_status()
-    data=response.json()
-    return {"quote":data["content"],"author":data["author"]}
+    try:   
+        response=await app.state.http_client.get("https://api.quotable.io/random")
+        response.raise_for_status()
+        data=response.json()
+        return {"quote":data["content"],"author":data["author"]}
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=502,detail=f"Upstream error: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500,detail=f"Unexpected error: {str(e)}")
+
