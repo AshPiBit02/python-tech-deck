@@ -30,6 +30,7 @@ def validate_cart(order:CheckOutResponse)->CheckOutResponse:
     stock=FAKE_STOCK.get(order.product_id,0)
     if stock==0:
         raise OutOfStockError(order.product_id)
+    FAKE_STOCK[order.product_id]=stock-1
     return order
 
 @app.exception_handler(OutOfStockError)
