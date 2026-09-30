@@ -18,7 +18,7 @@ app=FastAPI(title="Client IP Rate Limiting Demo")
 RATE_LIMIT=3
 WINDOW_SECONDS=10
 
-hints:dict[str,list[float]]=defaultdict(list)
+hits:dict[str,list[float]]=defaultdict(list)
 
 def get_real_client_ip(request:Request)->str:
     forwarded_for=request.headers.get("x-forwarded-for")
@@ -26,3 +26,16 @@ def get_real_client_ip(request:Request)->str:
         return forwarded_for.split(",")[0].strip()
     return request.client.host if request.client else "unknown"
 
+@app.get("/ping")
+def ping(request:Request):
+    ip=get_real_client_ip(request)
+    now=time.time()
+    recent_hits=[t for t in hits[ip] if now-t<WINDOW_SECONDS]
+    if len(recent_hits)>=RATE_LIMIT:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Rate limit exceeded for {ip}",
+        )
+    recent_hits.append(now)
+    hits[ip]=recent_hits
+    return {"ip":ip,"requests_in_window":len(recent_hits)}
