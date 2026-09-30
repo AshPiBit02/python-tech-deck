@@ -20,3 +20,8 @@ def get_public_base_url(request:Request)->str:
     host=request.headers.get("x-forwarded-host",request.headers.get("host",request.url.netloc))
     return f"{proto}://{host}"
 
+@app.get("/reset-link")
+def generate_reset_link(request:Request):
+    base_url=get_public_base_url(request)
+    token="abc569"
+    return {"reset_url":f"{base_url}/reset-password?token={token}"}
