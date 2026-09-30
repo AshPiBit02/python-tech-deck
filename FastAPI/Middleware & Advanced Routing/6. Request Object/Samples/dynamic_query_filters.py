@@ -21,3 +21,16 @@ RECORDS=[
 ]
 
 FILTERABLE_FIELDS={"status","country"}
+
+@app.get("/records")
+def list_records(request:Request):
+    filters={k:v for k,v in request.query_params.items() if k in FILTERABLE_FIELDS}
+    min_price=request.query_params.get("min_price")
+
+    results=RECORDS
+    for field,value in filters.items():
+        results=[r for r in results if str(r[field])==value]
+
+    if min_price is not None:
+        results=[r for r in results if r["price"]>=float(min_price)]
+    return {"filters_applied":{**filters,**({"min_price":min_price} if min_price else {})},"results":results}
