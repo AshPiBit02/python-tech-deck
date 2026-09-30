@@ -29,3 +29,11 @@ async def add_request_context(request: Request,call_next):
 
     response.headers["X-Request-ID"]=request.state.request_id
     return response
+
+
+@app.get("/whoami")
+def whoami(request:Request):
+    return {
+        "request_id":request.state.request_id,
+        "message":"This ID was sent in middleware, read here in the endpoint",
+    }
