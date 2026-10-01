@@ -10,7 +10,7 @@ HTTP response, in exactly one place.
 
 from fastapi import FastAPI,Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel,Field
 
 app=FastAPI(title="Domain Exception Vocabulary DEMO")
 
@@ -21,27 +21,43 @@ FAKE_BALANCES={
 }
 
 class InsufficientFundsError(Exception):
-    def __init__(self,accound_id:str,shortfall:float):
-        self.account_id=accound_id
+    def __init__(self,account_id:str,shortfall:float):
+        self.account_id=account_id
         self.shortfall=shortfall
 
+class AccountNotExists(Exception):
+    def __init__(self,account_id:str):
+        self.account_id=account_id
+
+def account_exists(account_id:str):
+    if account_id not in FAKE_BALANCES:
+        raise AccountNotExists(account_id)
+    
 def withdraw_from_account(account_id:str,amount:float):
+    account_exists(account_id)
     balance=FAKE_BALANCES.get(account_id,0)
     if amount>balance:
         raise InsufficientFundsError(account_id,amount-balance)
     FAKE_BALANCES[account_id]-=amount
     return FAKE_BALANCES[account_id]
 
+@app.exception_handler(AccountNotExists)
+def handle_account_exists(request:Request,exc:AccountNotExists):
+    return JSONResponse(
+        status_code=404,
+        content={"detail":f"Account {exc.account_id} not found!"},
+    )
+
 @app.exception_handler(InsufficientFundsError)
 async def handle_insufficient_funds(request:Request,exc:InsufficientFundsError):
     return JSONResponse(
-        status_code=402,
+        status_code=400,
         content={"detail":f"Account {exc.account_id} is short by {exc.shortfall}"},
     )
 
 class WithdrawRequest(BaseModel):
     account_id:str
-    amount:float
+    amount:float=Field(gt=0)
 
 @app.post("/withdraw")
 def withdraw(body:WithdrawRequest):
