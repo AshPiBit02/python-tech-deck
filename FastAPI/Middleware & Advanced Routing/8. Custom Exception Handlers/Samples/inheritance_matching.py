@@ -24,6 +24,10 @@ class CardExpiredError(PaymentError):
     def __init__(self,card_last_four:str):
         self.card_last_four=card_last_four
 
+class WalletError(PaymentError):
+    def __init__(self,id:str):
+        self.id=id
+
 @app.exception_handler(PaymentError)
 def handle_generic_payment_error(request:Request,exc:PaymentError):
     return JSONResponse(
@@ -42,6 +46,17 @@ def handle_insufficient_funds(request:Request,exc:InsufficientFundsError):
 def handle_card_expired(request:Request,exc:CardExpiredError):
     return JSONResponse(
         status_code=402,
-        content={"detail":"Card Expired!"}
+        content={"detail":"Card Expired! Visit nearest branch"}
     )
 
+@app.get("/pay/insufficient-funds")
+def trigger_insufficient_funds():
+    raise InsufficientFundsError(account_id="accX")
+
+@app.get("/pay/card-expired")
+def trigger_card_expired():
+    raise CardExpiredError(card_last_four="2026")
+
+@app.get("/pay/wallet")
+def trigger_general():
+    raise WalletError(id="56KL")
