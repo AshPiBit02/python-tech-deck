@@ -25,4 +25,11 @@ class InsufficientFundsError(Exception):
         self.account_id=accound_id
         self.shortfall=shortfall
 
+def withdraw_from_account(account_id:str,amount:float):
+    balance=FAKE_BALANCES.get(account_id,0)
+    if amount>balance:
+        raise InsufficientFundsError(account_id,amount-balance)
+    FAKE_BALANCES[account_id]-=amount
+    return FAKE_BALANCES[account_id]
+
 
