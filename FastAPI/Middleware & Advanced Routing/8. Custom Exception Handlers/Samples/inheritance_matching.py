@@ -24,4 +24,24 @@ class CardExpiredError(PaymentError):
     def __init__(self,card_last_four:str):
         self.card_last_four=card_last_four
 
+@app.exception_handler(PaymentError)
+def handle_generic_payment_error(request:Request,exc:PaymentError):
+    return JSONResponse(
+        status_code=402,
+        content={"detail":"Payment failed!"}
+    ) 
+
+@app.exception_handler(InsufficientFundsError)
+def handle_insufficient_funds(request:Request,exc:InsufficientFundsError):
+    return JSONResponse(
+        status_code=400,
+        content={"detail":f"Account {exc.account_id} has insufficient funds!"},
+    )
+
+@app.exception_handler(CardExpiredError)
+def handle_card_expired(request:Request,exc:CardExpiredError):
+    return JSONResponse(
+        status_code=402,
+        content={"detail":"Card Expired!"}
+    )
 
