@@ -32,4 +32,19 @@ def withdraw_from_account(account_id:str,amount:float):
     FAKE_BALANCES[account_id]-=amount
     return FAKE_BALANCES[account_id]
 
+@app.exception_handler(InsufficientFundsError)
+async def handle_insufficient_funds(request:Request,exc:InsufficientFundsError):
+    return JSONResponse(
+        status_code=402,
+        content={"detail":f"Account {exc.account_id} is short by {exc.shortfall}"},
+    )
+
+class WithdrawRequest(BaseModel):
+    account_id:str
+    amount:float
+
+@app.post("/withdraw")
+def withdraw(body:WithdrawRequest):
+    new_balance=withdraw_from_account(body.account_id,body.amount)
+    return {"account_id":body.account_id,"new_balance":new_balance}
 
