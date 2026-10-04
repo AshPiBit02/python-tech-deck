@@ -22,5 +22,5 @@ app=FastAPI(lifespan=lifespan)
 @app.get("/quote")
 async def get_quote(request:Request):
     response=await request.app.state.http_client.get("https://api.quotable.io/random")
-    data=response.json()
+    data=await response.json()
     return {"quote":data["content"],"author":data["author"]}
