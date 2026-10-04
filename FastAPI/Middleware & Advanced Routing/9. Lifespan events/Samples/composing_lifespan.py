@@ -28,3 +28,9 @@ async def fake_cache_lifespan(app:FastAPI):
     app.state.cache=None
     print("Cache cleared.")
 
+@asynccontextmanager
+async def lifespan(app:FastAPI):
+    async with AsyncExitStack() as stack:
+        await stack.enter_async_context(http_client_lifespan(app))
+        await stack.enter_async_context(fake_cache_lifespan(app))
+        yield
