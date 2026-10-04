@@ -24,7 +24,9 @@ async def lifespan(app:FastAPI):
     yield
     app.state.ready=False
 
-app=FastAPI("/healthy/ready")
+app=FastAPI(lifespan=lifespan)
+
+@app.get("/health/ready")
 def readiness_check(request:Request):
     if not request.app.state.ready:
         raise HTTPException(status_code=503,detail="Not ready")
