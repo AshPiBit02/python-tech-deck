@@ -34,3 +34,12 @@ async def lifespan(app:FastAPI):
         await stack.enter_async_context(http_client_lifespan(app))
         await stack.enter_async_context(fake_cache_lifespan(app))
         yield
+
+app=FastAPI(lifespan=lifespan)
+
+@app.get("/status")
+def status(request:Request):
+    return {
+        "http_client_ready":request.app.state.http_client is not None,
+        "cache":request.app.state.cache,
+    }
