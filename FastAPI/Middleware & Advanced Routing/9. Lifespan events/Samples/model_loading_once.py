@@ -30,3 +30,12 @@ async def lifespan(app:FastAPI):
     print("Shutdown: releasing model.")
 
 
+app=FastAPI(lifespan=lifespan)
+
+class PredictRequest(BaseModel):
+    value:float
+
+@app.post("/predict")
+def predict(body:PredictRequest,request:Request):
+    result=request.app.state.model.predict(body.value)
+    return {"prediction":result}
