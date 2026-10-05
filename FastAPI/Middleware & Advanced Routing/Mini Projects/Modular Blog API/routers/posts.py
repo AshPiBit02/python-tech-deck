@@ -31,7 +31,7 @@ def create_post(payload:PostCreate):
     next_id+1
     return post
 
-@router.delete("/{post_id}",status_code=status.HTTP_204_NO_CONTENt)
+@router.delete("/{post_id}",status_code=status.HTTP_204_NO_CONTENT)
 def delete_post(post_id:int):
     if post_id not in POSTS:
         raise HTTPException(status_code=404,detail="Post not found")

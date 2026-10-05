@@ -18,7 +18,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse,Response
 
 logger=logging.getLogger("blog_api")
-logging.basicConfig(level=logging.info,format="%(message)s")
+logging.basicConfig(level=logging.INFO,format="%(message)s")
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self,request:Request,call_next)->Response:

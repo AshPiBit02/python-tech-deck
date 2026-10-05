@@ -18,7 +18,7 @@ def create_user(payload:UserCreate):
 def list_users():
     return list(users_db.values())
 
-@router.get("/{user_id}",responses_model=User)
+@router.get("/{user_id}",response_model=User)
 def get_user(user_id:int):
     user=users_db.get(user_id)
     if user is None:
