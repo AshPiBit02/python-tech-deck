@@ -7,7 +7,7 @@ router=APIRouter(prefix="/posts",tags=["Posts"])
 
 POSTS:dict[int,dict]={
 }
-next_id=4
+next_id=1
 
 
 @router.get("/")
@@ -28,7 +28,7 @@ def create_post(payload:PostCreate):
         raise HTTPException(status_code=404,detail="Author(user) not found")
     post=Post(id=next_id,created_at=datetime.now(timezone.utc),**payload.model_dump())
     POSTS[post.id]=post
-    next_id+1
+    next_id+=1
     return post
 
 @router.delete("/{post_id}",status_code=status.HTTP_204_NO_CONTENT)
