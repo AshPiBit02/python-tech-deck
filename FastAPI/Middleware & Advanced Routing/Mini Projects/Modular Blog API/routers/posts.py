@@ -1,18 +1,14 @@
 from fastapi import APIRouter,HTTPException
-from pydantic import BaseModel
+from datetime import datetime,timezone
+from models import Post,PostCreate
+from routers.users import users_db
 
 router=APIRouter(prefix="/posts",tags=["Posts"])
 
 POSTS:dict[int,dict]={
-    1:{"id":1,"title":"Hello World","content":"The first post"},
-    1:{"id":2,"title":"Statements","content":"The second post"},
-    1:{"id":3,"title":"Conditional Statements","content":"The third post"},
 }
 next_id=4
 
-class PostCreate(BaseModel):
-    title:str
-    content:str
 
 @router.get("/")
 def list_posts():
@@ -26,9 +22,11 @@ def get_post(post_id:int):
     return post
 
 @router.post("/",status_code=201)
-def create_post(body:PostCreate):
+def create_post(payload:PostCreate):
     global next_id
-    post={"id":next_id,"title":body.title,"content":body.content}
-    POSTS[next_id]=post
-    next_id+=1
+    if payload.author_id not in users_db:
+        raise HTTPException(status_code=404,detail="Author(user) not found")
+    post=Post(id=next_id,created_at=datetime.now(timezone.utc),**payload.model_dump())
+    POSTS[post.id]=post
+    next_id+1
     return post

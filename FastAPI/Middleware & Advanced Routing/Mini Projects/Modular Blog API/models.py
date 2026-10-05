@@ -11,6 +11,7 @@ class User(UserCreate):
 class PostCreate(BaseModel):
     title:str
     content:str
+    author_id:int
 
 class Post(PostCreate):
     id:int
