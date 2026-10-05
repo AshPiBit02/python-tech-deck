@@ -1,4 +1,4 @@
-from fastapi import APIRouter,HTTPException
+from fastapi import APIRouter,HTTPException,status
 from datetime import datetime,timezone
 from models import Post,PostCreate
 from routers.users import users_db
@@ -30,3 +30,9 @@ def create_post(payload:PostCreate):
     POSTS[post.id]=post
     next_id+1
     return post
+
+@router.delete("/{post_id}",status_code=status.HTTP_204_NO_CONTENt)
+def delete_post(post_id:int):
+    if post_id not in POSTS:
+        raise HTTPException(status_code=404,detail="Post not found")
+    del POSTS[post_id]
