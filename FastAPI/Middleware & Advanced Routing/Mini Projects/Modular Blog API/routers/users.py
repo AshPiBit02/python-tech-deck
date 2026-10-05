@@ -18,3 +18,15 @@ def create_user(payload:UserCreate):
 def list_users():
     return list(users_db.values())
 
+@router.get("/{user_id}",responses_model=User)
+def get_user(user_id:int):
+    user=users_db.get(user_id)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail="User not found!")
+    return User
+
+@router.delete("/{user_id}",status_code=status.HTTP_204_NO_CONTENT)
+def delete_user(user_id:int):
+    if user_id not in users_db:
+        raise HTTPException(status_code=404,detail="User not found")
+    del users_db[user_id]
