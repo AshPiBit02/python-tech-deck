@@ -18,7 +18,7 @@ def restock(product_id:int,payload:StockAdjust):
     return StockLevel(product_id=property,available=STOCK_DB[product_id])
 
 def reverse_stock(product_id:int,quantity:int)->None:
-    available=STOCK_DB.get(product_id)
+    available=int(STOCK_DB.get(product_id))
     if quantity > available:
         raise OutStockError(product_id=product_id,requested=quantity,available=available)
     STOCK_DB[product_id]=available-quantity

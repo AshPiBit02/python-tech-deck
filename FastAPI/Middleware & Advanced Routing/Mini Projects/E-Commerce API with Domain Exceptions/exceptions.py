@@ -3,7 +3,7 @@ class OutStockError(Exception):
         self.product_id=product_id
         self.requested=requested
         self.available=available
-        super.__init__(f"Product {product_id} out of stock: requested {requested}, available {available}")
+        super().__init__(f"Product {product_id} out of stock: requested {requested}, available {available}")
 
 class InvalidCouponError(Exception):
     def __init__(self,code:str,reason:str="Coupon is invalid or expired"):

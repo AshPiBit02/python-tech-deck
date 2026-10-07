@@ -43,7 +43,7 @@ def create_order(payload:CreateOrder,engine:FakeDBEngine=Depends(get_db_engine))
         )
         ORDERS_DB[order.id]=order
         next_id+=1
-        engine._data.setdefault("orders",[]).append(order.id)
+        engine.data.setdefault("orders",[]).append(order.id)
         return order
 
 @router.get("/{order_id}",response_model=Order)
