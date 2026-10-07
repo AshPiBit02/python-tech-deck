@@ -45,3 +45,14 @@ def create_order(payload:CreateOrder,engine:FakeDBEngine=Depends(get_db_engine))
         next_id+=1
         engine._data.setdefault("orders",[]).append(order.id)
         return order
+
+@router.get("/{order_id}",response_model=Order)
+def get_order(order_id:int):
+    order=ORDERS_DB.get(order_id)
+    if order is None:
+        raise OrderNotFoundError(order_id==order_id)
+    return order
+
+@router.get("/",response_model=list[Order])
+def list_orders():
+    return list(ORDERS_DB.values())
