@@ -18,3 +18,15 @@ class FakeDBEngine:
         self.connected=False
         print("[DB] engine disconnected")
 
+@asynccontextmanager
+async def lifespan(app:FastAPI):
+    engine=FakeDBEngine()
+    await engine.connect()
+    app.state.db_engine=engine
+
+    yield
+
+    await engine.disconnect()
+
+def get_db_engine(request:Request)->FakeDBEngine:
+    return request.app.state.db_engine
