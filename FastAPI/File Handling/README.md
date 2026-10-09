@@ -1,4 +1,4 @@
-# File Handling in FastAPI
+# File Handling
 
 Up to this point, every request body in the auth system and the mini projects has been JSON — small, structured, text-based data parsed into Pydantic models. File handling introduces a fundamentally different kind of input and output: **binary data of arbitrary size** (images, PDFs, CSVs, videos) that cannot be parsed into a Pydantic model, may be too large to hold comfortably in memory, and carries its own metadata (filename, declared content type) that cannot be trusted at face value. This phase covers how FastAPI receives files from clients, how to store and validate them safely, and how to send files back out efficiently.
 
