@@ -17,3 +17,10 @@ async def stream_file(filename:str):
                 yield chunk
     return StreamingResponse(chunks(),media_type="application/octet-stream")
 
+@app.get("/export/csv")
+async def export_csv():
+    def rows():
+        yield "id,name\n"
+        for i in range(1,1001):
+            yield f"{i},user_{i}\n"
+    return StreamingResponse(rows(),media_type="text/csv",headers={"Content-Disposition":'attachment; filename="users.csv"'})
