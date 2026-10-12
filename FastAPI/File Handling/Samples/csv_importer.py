@@ -11,3 +11,8 @@ async def read_csv(file:UploadFile)->pd.DataFrame:
         return pd.read_csv(io.BytesIO(await file.read()))
     except Exception:
         raise HTTPException(400,"Could not parse CSV")
+
+@app.post("/upload/csv")
+async def summary(file:UploadFile=File(...)):
+    df=await read_csv(file)
+    return {"rows":len(df),"columns":list(df.columns),"nulls":df.isnull().sum().to_dict()}
