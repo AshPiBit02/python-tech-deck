@@ -1,0 +1,11 @@
+id,name,age,city,salary
+1,Alice,23,New York,50000
+2,Bob,30,London,60000
+3,Charlie,25,Sydney,55000
+4,David,19,Tokyo,48000
+5,Eva,35,Berlin,72000
+6,Frank,,Paris,65000
+7,Grace,28,,58000
+8,Helen,40,Delhi,
+9,Ian,22,San Francisco,51000
+10,Jane,27,New York,59000

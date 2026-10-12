@@ -22,3 +22,9 @@ async def preview(file:UploadFile=File(...)):
     df = await read_csv(file)
     return df.head(10).fillna("").to_dict(orient="records")
 
+@app.post("/upload/csv/filter")
+async def filter(col:str,gt:float,file:UploadFile=File(...)):
+    df =await read_csv(file)
+    if col not in df.columns or not pd.api.types.is_numeric_dtype(df[col]):
+        raise HTTPException(400,f"'{col}' must be an existing numeric column")
+    return df[df[col]>gt].fillna("").to_dict(orient="records")
