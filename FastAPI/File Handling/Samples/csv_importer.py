@@ -16,3 +16,9 @@ async def read_csv(file:UploadFile)->pd.DataFrame:
 async def summary(file:UploadFile=File(...)):
     df=await read_csv(file)
     return {"rows":len(df),"columns":list(df.columns),"nulls":df.isnull().sum().to_dict()}
+
+@app.post("/upload/csv/preview")
+async def preview(file:UploadFile=File(...)):
+    df = await read_csv(file)
+    return df.head(10).fillna("").to_dict(orient="records")
+
