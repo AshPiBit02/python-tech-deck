@@ -202,3 +202,4 @@ Memory usage stays flat regardless of total size, since only one chunk exists in
 - FastAPI enforces no upload size limit by default — enforce one explicitly, ideally also at the reverse-proxy level.
 - A declared `content_type` is a client claim, not a fact; real type validation inspects the file's magic bytes, remembering to `seek(0)` afterwards.
 - `FileResponse` serves files from disk; `StreamingResponse` serves large or generated content in chunks without holding it all in memory.
+- 
