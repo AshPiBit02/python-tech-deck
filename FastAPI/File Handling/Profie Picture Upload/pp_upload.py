@@ -28,3 +28,10 @@ async def update_profile(id:str,avatar:UploadFile=File(...)):
         f.write(profile)
     return {"message":"Profile uploaded successfully","saved_as":dest.name}
 
+
+@app.get("/users/{id}/avatar")
+async def get_profile(id:str):
+    path=(AVATAR_DIR/f"{id}.png").resolve()
+    if not path.is_file():
+        raise HTTPException(404,"Avatar not found")
+    return FileResponse(path,filename=path.name)
