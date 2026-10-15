@@ -14,7 +14,7 @@ async def update_profile(id:str,avatar:UploadFile=File(...)):
         raise HTTPException(415,"Unsupported Media Type")
 
     head=await avatar.read(8)
-    if not (head.startswith(b"\xff\xd8\xff") or head.startswith(b"\x89PNG\r\n\xla\n")):
+    if not (head.startswith(b"\xff\xd8\xff") or head.startswith(b"\x89PNG\r\n\x1a\n")):
         raise HTTPException(415,"Unsupported Media Type")
 
     await avatar.seek(0)
