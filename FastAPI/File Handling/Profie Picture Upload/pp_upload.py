@@ -10,14 +10,13 @@ async def update_profile(id:str,avatar:UploadFile=File(...)):
         raise HTTPException(415,"Unsupported Media Type")
 
     head=await avatar.read(8)
-    if not (head.startswith(b"\xff\xd8\xff") or head.startswith(b"\x89PNG\r\xla\n")):
+    if not (head.startswith(b"\xff\xd8\xff") or head.startswith(b"\x89PNG\r\n\xla\n")):
         raise HTTPException(415,"Unsupported Media Type")
 
     profile=await avatar.read()
-    if len(profile)>1024*2024*2:
+    if len(profile)>2*1024*1024:
         raise HTTPException(413,"File too large (max 2 MB)")
 
-    
-
+    await avatar.seek(0)
     
 
