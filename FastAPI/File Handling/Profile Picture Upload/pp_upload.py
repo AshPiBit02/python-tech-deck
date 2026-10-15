@@ -23,7 +23,7 @@ async def update_profile(id:str,avatar:UploadFile=File(...)):
     if len(profile)>2*1024*1024:
         raise HTTPException(413,"File too large (max 2 MB)")
 
-    dest=AVATAR_DIR/f"{id}.png"
+    dest=AVATAR_DIR/f"avtr{id}.png"
     with dest.open("wb") as f:
         f.write(profile)
     return {"message":"Profile uploaded successfully","saved_as":dest.name}
@@ -31,7 +31,7 @@ async def update_profile(id:str,avatar:UploadFile=File(...)):
 
 @app.get("/users/{id}/avatar")
 async def get_profile(id:str):
-    path=(AVATAR_DIR/f"{id}.png").resolve()
+    path=(AVATAR_DIR/f"avtr{id}.png").resolve()
     if not path.is_file():
         raise HTTPException(404,"Avatar not found")
     return FileResponse(path,filename=path.name)
