@@ -31,10 +31,16 @@ def test_rejects_non_pdf(client):
 def test_rejects_oversize(client):
     assert post(client,data=PDF+b"0"*(main.MAX_SIZE+1)).status_code==413
 
+def test_rejects_fake_pdf(client):
+    assert post(client, data=b"not a pdf at all").status_code == 415
 
 def test_missing_name(client):
     r=client.post("/apply",data={"applicant_id":536},files={"resume":("cv.pdf",PDF,"application/pdf")})
     assert r.status_code==422
+    
+def test_applicant_id_saved(client):
+    post(client, id=536)
+    assert client.get("/applications").json()[0]["applicant_id"] == 536
 
 def test_two_applicants_same_filename(client):
     post(client,name="Temoit Huang")
