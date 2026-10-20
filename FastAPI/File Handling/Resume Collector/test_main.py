@@ -1,4 +1,3 @@
-import json
 import pytest
 from fastapi.testclient import TestClient
 
@@ -37,7 +36,7 @@ def test_rejects_fake_pdf(client):
 def test_missing_name(client):
     r=client.post("/apply",data={"applicant_id":536},files={"resume":("cv.pdf",PDF,"application/pdf")})
     assert r.status_code==422
-    
+
 def test_applicant_id_saved(client):
     post(client, id=536)
     assert client.get("/applications").json()[0]["applicant_id"] == 536
