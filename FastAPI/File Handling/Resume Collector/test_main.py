@@ -12,3 +12,8 @@ def client(tmp_path,monkeypatch):
     monkeypatch.setattr(main,"DB_FILE",tmp_path/"applications.json")
     (tmp_path/"resumes").mkdir()
     return TestClient(main.app)
+
+
+def post(client,name="Temoit Huang",filename="cv.pdf",data=PDF,ctype="application/pdf"):
+    return client.post("/apply",data={"name":name},files={"resumes":(filename,data,ctype)})
+
