@@ -42,6 +42,7 @@ async def apply(applicant_id:int=Form(...),name:str=Form(...,min_length=2,max_le
 
     record={
         "id":uuid.uuid4().hex,
+        "applicant_id":applicant_id,
         "name":name.strip(),
         "original_filename":resume.filename,
         "stored_filename":stored_name,

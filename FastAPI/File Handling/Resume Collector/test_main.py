@@ -14,8 +14,8 @@ def client(tmp_path,monkeypatch):
     return TestClient(main.app)
 
 
-def post(client,name="Temoit Huang",filename="cv.pdf",data=PDF,ctype="application/pdf"):
-    return client.post("/apply",data={"name":name},files={"resumes":(filename,data,ctype)})
+def post(client,id=536,name="Temoit Huang",filename="cv.pdf",data=PDF,ctype="application/pdf"):
+    return client.post("/apply",data={"applicant_id":id,"name":name},files={"resumes":(filename,data,ctype)})
 
 def test_valid_application(client):
     r=post(client)
@@ -31,8 +31,9 @@ def test_rejects_non_pdf(client):
 def test_rejects_oversize(client):
     assert post(client,data=PDF+b"0"*(main.MAX_SIZE+1)).status_code==413
 
+
 def test_missing_name(client):
-    r=client.post("/apply",files={"resume":("cv.pdf",PDF,"application/pdf")})
+    r=client.post("/apply",data={"applicant_id":536},files={"resume":("cv.pdf",PDF,"application/pdf")})
     assert r.status_code==422
 
 def test_two_applicants_same_filename(client):
