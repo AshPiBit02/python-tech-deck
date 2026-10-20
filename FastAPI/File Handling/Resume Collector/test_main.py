@@ -27,3 +27,8 @@ def test_valid_application(client):
 
 def test_rejects_non_pdf(client):
     assert post(client,filename="cv.docx",ctype="application/msword").status_code==415
+
+def test_rejects_oversize(client):
+    assert post(client,data=PDF+b"0"*(main.MAX_SIZE+1)).status_code==413
+
+    
