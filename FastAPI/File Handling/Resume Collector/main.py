@@ -54,3 +54,7 @@ async def apply(name:str=Form(...,min_length=2,max_length=100),resume:UploadFile
         "message":"Application received",
         "id":record["id"]
     }
+
+@app.get("/applications")
+async def list_applications():
+    return load_records()
