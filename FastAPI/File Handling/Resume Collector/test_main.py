@@ -24,4 +24,6 @@ def test_valid_application(client):
     assert records[0]["name"]=="Temoit Huang"
     assert (main.RESUME_DIR/records[0]["stored_filename"]).exists()
 
-    
+
+def test_rejects_non_pdf(client):
+    assert post(client,filename="cv.docx",ctype="application/msword").status_code==415
