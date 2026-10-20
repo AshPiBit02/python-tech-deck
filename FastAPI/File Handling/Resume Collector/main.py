@@ -10,7 +10,7 @@ app=FastAPI(title="Resume Collector")
 RESUME_DIR=Path("resumes")
 DB_FILE=Path("application.json")
 MAX_SIZE=2*1024*1024
-LOCK=threading.lock() # protects the JSON file from concurrent writes
+LOCK=threading.Lock() # protects the JSON file from concurrent writes
 
 RESUME_DIR.mkdir(exist_ok=True)
 
@@ -26,7 +26,7 @@ def add_record(record:dict)->None:
         DB_FILE.write_text(json.dumps(records,indent=2))
 
 @app.post("/apply",status_code=201)
-async def apply(name:str=Form(...,min_length=2,max_length=100),resume:UploadFile=File(...)):
+async def apply(applicant_id:int=Form(...),name:str=Form(...,min_length=2,max_length=100),resume:UploadFile=File(...)):
     if not (resume.filename or "").lower().endswith(".pdf") or resume.content_type!="application/pdf":
         raise HTTPException(415,"Only PDF resumes are allowed")
 
