@@ -35,3 +35,8 @@ def test_missing_name(client):
     r=client.post("/apply",files={"resume":("cv.pdf",PDF,"application/pdf")})
     assert r.status_code==422
 
+def test_two_applicants_same_filename(client):
+    post(client,name="Temoit Huang")
+    post(client,name="Dikstra Troy")
+    names=[r["stored_filename"] for r in client.get("/applications").json()]
+    assert len(set(names))==2
