@@ -31,4 +31,7 @@ def test_rejects_non_pdf(client):
 def test_rejects_oversize(client):
     assert post(client,data=PDF+b"0"*(main.MAX_SIZE+1)).status_code==413
 
-    
+def test_missing_name(client):
+    r=client.post("/apply",files={"resume":("cv.pdf",PDF,"application/pdf")})
+    assert r.status_code==422
+
