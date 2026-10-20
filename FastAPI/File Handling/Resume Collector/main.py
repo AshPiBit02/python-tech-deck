@@ -18,3 +18,10 @@ def load_records()->list:
     if not DB_FILE.exists():
         return []
     return json.loads(DB_FILE.read_text())
+
+def add_record(record:dict)->None:
+    with LOCK:
+        records=load_records()
+        records.append(record)
+        DB_FILE.write_text(json.dumps(records,indent=2))
+
