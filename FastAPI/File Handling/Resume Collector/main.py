@@ -8,7 +8,7 @@ from fastapi import FastAPI,File,Form,HTTPException,UploadFile
 app=FastAPI(title="Resume Collector")
 
 RESUME_DIR=Path("resumes")
-DB_FILE=Path("application.json")
+DB_FILE=Path("applications.json")
 MAX_SIZE=2*1024*1024
 LOCK=threading.Lock() # protects the JSON file from concurrent writes
 
@@ -26,11 +26,11 @@ def add_record(record:dict)->None:
         DB_FILE.write_text(json.dumps(records,indent=2))
 
 @app.post("/apply",status_code=201)
-async def apply(applicant_id:int=Form(...),name:str=Form(...,min_length=2,max_length=100),resume:UploadFile=File(...)):
-    if not (resume.filename or "").lower().endswith(".pdf") or resume.content_type!="application/pdf":
+async def apply(applicant_id:int=Form(...,gt=0),name:str=Form(...,min_length=2,max_length=100),resumes:UploadFile=File(...)):
+    if not (resumes.filename or "").lower().endswith(".pdf") or resumes.content_type!="application/pdf":
         raise HTTPException(415,"Only PDF resumes are allowed")
 
-    data=await resume.read(MAX_SIZE+1)
+    data=await resumes.read(MAX_SIZE+1)
     if len(data)>MAX_SIZE:
         raise HTTPException(413,"Resume too large (max 2 MB)")
 
@@ -42,8 +42,9 @@ async def apply(applicant_id:int=Form(...),name:str=Form(...,min_length=2,max_le
 
     record={
         "id":uuid.uuid4().hex,
+        "applicant_id":applicant_id,
         "name":name.strip(),
-        "original_filename":resume.filename,
+        "original_filename":resumes.filename,
         "stored_filename":stored_name,
         "size":len(data),
         "applied_at":datetime.now(timezone.utc).isoformat(),
