@@ -17,3 +17,11 @@ def client(tmp_path,monkeypatch):
 def post(client,name="Temoit Huang",filename="cv.pdf",data=PDF,ctype="application/pdf"):
     return client.post("/apply",data={"name":name},files={"resumes":(filename,data,ctype)})
 
+def test_valid_application(client):
+    r=post(client)
+    assert r.status_code==201
+    records=client.get("/applications").json()
+    assert records[0]["name"]=="Temoit Huang"
+    assert (main.RESUME_DIR/records[0]["stored_filename"]).exists()
+
+    
