@@ -1,425 +1,298 @@
-# Phase 10 — Testing FastAPI Applications
+# Testing FastAPI Applications
 
-> **Mini project:** Test suite for the Phase 5 Contact Book API
-> **Done when:** `pytest --cov` shows **80%+ coverage**, all tests pass, and every run starts from a **fresh test database**.
-> **Time:** 3–4 days
+Testing is what turns a working application into a maintainable one. Every earlier phase produced code that was verified manually — through Swagger UI, Postman, or curl. Manual verification has a hard limit: it only proves the application worked *at the moment someone checked*, for the specific inputs they happened to try. An automated test suite re-proves, in seconds and on every change, that behavior which used to work still works. This phase covers how FastAPI applications are tested with `pytest`, how test isolation is achieved, and how to measure and improve coverage.
 
-Companion files: [`TEST_PLAN.md`](TEST_PLAN.md) (what to test, checklist) · [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md) (common errors, command cheatsheet)
+## Why Testing Matters More for APIs Than It First Appears
 
----
+An API is a contract with its consumers. A frontend, a mobile app, or another service depends on specific routes returning specific status codes and response shapes. A change that silently alters a response field name, or accidentally loosens an authorization check, may not crash anything — it simply breaks a consumer, or opens a security hole, without any visible error on the server. Real examples of bugs that a test suite catches immediately and manual testing routinely misses:
 
-## 1. Why test at all?
+- A refactor that removes the `"type": "access"` claim from a JWT, causing every protected route to reject valid tokens.
+- A dependency change that lets a regular user reach an admin-only route.
+- A schema edit that starts returning `hashed_password` in a response body.
+- A validator that stops rejecting weak passwords.
 
-| Without tests | With tests |
+Each of these is a single assertion in a test, and each is easy to introduce accidentally during unrelated work.
+
+## The Testing Toolkit
+
+| Tool | Purpose |
 |---|---|
-| Every refactor (Phase 11) is a gamble | Refactor, run `pytest`, know in seconds |
-| Auth bugs ship silently | Protected routes are verified with/without token |
-| Manual testing in `/docs` per change | One command re-checks everything |
-
-**Test pyramid for APIs** (what you'll write in this phase):
-
-```
-        /\        Few  : end-to-end flows (register -> login -> create -> delete)
-       /  \
-      /----\      Many : API/integration tests (client -> route -> DB)   <- main focus
-     /------\
-    /--------\    Some : unit tests (pure functions: password hashing, validators)
-```
-
-For FastAPI, the highest-value tests are **API tests with `TestClient`** — they exercise routing, validation, dependencies, and DB in one shot.
-
----
-
-## 2. Setup
+| `pytest` | Test runner — discovers test functions, runs them, reports results |
+| `TestClient` (from `fastapi.testclient`) | Calls the app in-process without starting a real server; synchronous API |
+| `httpx.AsyncClient` | Async alternative, required when the test itself must `await` things |
+| `pytest-cov` | Measures which lines of the application the tests actually executed |
+| `dependency_overrides` | FastAPI's built-in mechanism for swapping real dependencies with test versions |
 
 ```bash
 pip install pytest httpx pytest-cov
-# only if you test async code:
-pip install pytest-asyncio
 ```
 
-`requirements-dev.txt`:
-```
-pytest
-httpx
-pytest-cov
-pytest-asyncio
-```
+## `TestClient` — The Everyday Tool
 
-> `TestClient` is built on `httpx` — it will not import without it.
-
-### Recommended layout
-
-```
-contact_book/
-├── main.py
-├── db/database.py          # engine, SessionLocal, Base, get_db
-├── models/
-├── schemas/
-├── routers/
-├── tests/
-│   ├── __init__.py         # (empty) keeps imports predictable
-│   ├── conftest.py         # shared fixtures: db, client, auth
-│   ├── factories.py        # test-data builders
-│   ├── test_contacts.py    # CRUD + search + validation
-│   ├── test_auth.py        # login, protected routes
-│   └── test_admin.py       # role-based routes
-├── pytest.ini
-└── requirements-dev.txt
-```
-
-`pytest.ini`:
-```ini
-[pytest]
-testpaths = tests
-addopts = -ra --strict-markers
-asyncio_mode = auto
-```
-
-> Remove `asyncio_mode` if you did not install `pytest-asyncio`.
-
----
-
-## 3. Core concepts
-
-### 3.1 pytest basics
-- Files `test_*.py`, functions `test_*`. Plain `assert` — no `assertEqual` needed (unlike Java JUnit).
-- Test **one behavior per test**; name it like a sentence: `test_duplicate_email_rejected`.
-- Structure each test as **Arrange -> Act -> Assert**.
-
-```python
-def test_get_nonexistent_contact(client):
-    response = client.get("/contacts/9999")      # Act
-    assert response.status_code == 404            # Assert
-```
-
-### 3.2 `TestClient` (sync)
-Calls your app **in-process** — no server, no network, no port.
+`TestClient` wraps the application so requests can be made as plain function calls, with no network, no server process, and no ports involved:
 
 ```python
 from fastapi.testclient import TestClient
 from main import app
 
 client = TestClient(app)
-r = client.get("/contacts")
-assert r.status_code == 200
+
+def test_about_route():
+    response = client.get("/about")
+    assert response.status_code == 200
+    assert "description" in response.json()
 ```
 
-### 3.3 `AsyncClient` (async tests)
-Use only when the **test itself** must `await` (async DB engine, async helpers). Otherwise `TestClient` works fine even for `async def` routes.
+The client exposes the familiar HTTP verbs (`get`, `post`, `put`, `patch`, `delete`) and accepts `json=`, `data=` (form-encoded), `headers=`, `params=`, and `files=`. The distinction between `json=` and `data=` is the same one that matters in Postman — `/token` expects form data (`data=`), while Pydantic-model routes expect JSON (`json=`).
+
+### Using `TestClient` as a Context Manager
+
+```python
+def test_with_lifespan():
+    with TestClient(app) as client:
+        response = client.get("/quote")
+        assert response.status_code == 200
+```
+
+The `with` form is required whenever the application defines a `lifespan` — only the context-manager form runs lifespan startup and shutdown. Without it, anything created during lifespan (a shared HTTP client, a loaded model, `app.state` values) simply does not exist, and tests fail with confusing `AttributeError`s. This is why the auth system's `conftest.py` creates its client inside a `with` block.
+
+## Test Isolation — The Central Problem
+
+A test is only trustworthy if its result does not depend on what ran before it. Shared mutable state — a database table, an in-memory dict, a file on disk — is the usual source of tests that pass alone but fail together (or the reverse). Several isolation strategies exist, with different tradeoffs:
+
+| Strategy | How it works | Tradeoff |
+|---|---|---|
+| Transaction rollback per test | Each test runs inside a transaction that is rolled back afterward | Fast, real database behavior; requires the code under test not to commit outside the test's connection |
+| Recreate tables per test | `create_all` before, `drop_all` after each test | Simple and thorough, but slow with many tests |
+| Separate test database | A dedicated database that is never the development one | Essential baseline — protects real data regardless of other strategy |
+| In-memory SQLite | Throwaway database in RAM | Very fast, but SQL dialect differences (e.g. Postgres native `ENUM`) can hide or create bugs |
+
+The auth system's approach — a separate Postgres test database, tables created once per session, each test wrapped in a rolled-back transaction — combines the first and third strategies and avoids the SQLite dialect gap entirely.
+
+## Fixtures — Reusable Setup and Teardown
+
+A fixture is a function that prepares something tests need, handed to tests by parameter name:
+
+```python
+import pytest
+
+@pytest.fixture
+def sample_user():
+    return {"email": "alice@example.com", "password": "strongpass123"}
+
+def test_register(client, sample_user):
+    response = client.post("/register", json={**sample_user, "confirm_password": sample_user["password"]})
+    assert response.status_code == 200
+```
+
+Key fixture properties:
+
+- **`yield` fixtures** run setup before the `yield` and teardown after the test finishes, whether it passed or failed.
+- **`scope`** controls how often a fixture re-runs: `function` (default, every test), `module`, or `session` (once for the entire run). Expensive setup such as creating tables belongs at `session` scope; anything holding per-test state must stay at `function` scope.
+- **`conftest.py`** is a special file pytest loads automatically; fixtures defined there are available to every test in that directory and below, with no import needed.
+- **Fixtures can depend on other fixtures** by listing them as parameters, forming a dependency chain resolved automatically — `auth_headers` depends on `client` and `registered_user`, which depends on `db_session`.
+
+## Overriding Dependencies — FastAPI's Key Testing Feature
+
+Because FastAPI routes receive their collaborators through `Depends()`, a test can substitute any of them without touching application code:
+
+```python
+from main import app
+from db.database import get_db
+from dependencies.auth import get_current_user
+
+def override_get_db():
+    yield test_session
+
+def override_get_current_user():
+    return FakeUser(id=1, role="admin")
+
+app.dependency_overrides[get_db] = override_get_db
+app.dependency_overrides[get_current_user] = override_get_current_user
+```
+
+This enables two distinct styles of test:
+
+- **Integration-style** — override only the database so everything else (real auth, real validation, real routes) runs for real against a test database. Catches wiring bugs.
+- **Isolated/unit-style** — override `get_current_user` so a route can be tested without generating real tokens at all, focusing purely on that route's own logic.
+
+`app.dependency_overrides` is global state on the app object, so it **must be cleared** after each test (`app.dependency_overrides.clear()`), ideally inside a fixture's teardown. Leaked overrides are a classic cause of tests affecting each other.
+
+## Testing Authenticated Routes
+
+Protected routes need a valid token. Two approaches, used for different purposes:
+
+```python
+@pytest.fixture
+def auth_headers(client, registered_user):
+    response = client.post("/token", data={"username": registered_user.email, "password": "strongpass"})
+    return {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+def test_get_me(client, auth_headers):
+    response = client.get("/me", headers=auth_headers)
+    assert response.status_code == 200
+```
+
+- **Real login flow** (above) — exercises the true authentication path end to end. Preferred for the small number of tests that verify authentication itself.
+- **Overriding `get_current_user`** — bypasses tokens entirely. Preferred for the many tests of business logic behind authentication, where re-running the login flow each time adds no information and slows the suite.
+
+A thorough suite also tests the **negative cases**: no token (401), garbage token (401), expired token (401), wrong token type such as a refresh token used as an access token (401), valid token with insufficient role (403). The ordering guarantee from the lifecycle phase — `401` before `403` — is itself something worth asserting.
+
+## Async Tests — `httpx.AsyncClient`
+
+When a test itself needs to `await` something (calling an async helper, using an async database session directly), the synchronous `TestClient` is not enough. The current pattern uses `httpx.AsyncClient` with an explicit ASGI transport:
 
 ```python
 import pytest
 from httpx import AsyncClient, ASGITransport
 from main import app
 
-@pytest.mark.asyncio
-async def test_list_contacts_async():
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-        r = await ac.get("/contacts")
-    assert r.status_code == 200
+@pytest.mark.anyio
+async def test_async_route():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get("/about")
+    assert response.status_code == 200
 ```
 
-> `AsyncClient(app=app)` is the old syntax — removed in newer httpx. Use `ASGITransport`.
+Two details are current-practice specifics: the transport is passed explicitly via `ASGITransport(app=app)` (the older `AsyncClient(app=app)` shortcut has been removed from recent `httpx` versions), and async test functions need a plugin — either `pytest-asyncio` or `anyio`'s pytest plugin (`@pytest.mark.anyio`, which also requires an `anyio_backend` fixture returning `"asyncio"` if trio is not wanted). For applications whose routes are plain `def` with a synchronous database layer, like the auth system, `TestClient` alone is sufficient and simpler.
 
-### 3.4 Fixtures
-Reusable setup/teardown, injected by **parameter name**. `yield` splits setup from teardown.
-
-| Scope | Runs | Use for |
-|---|---|---|
-| `function` (default) | once per test | DB session, client (isolation) |
-| `module` / `session` | once per file / run | expensive, read-only setup |
-
-### 3.5 Dependency overrides — *the key FastAPI testing feature*
-Your routes use `Depends(get_db)`. In tests you swap it for a test DB:
+## Parametrized Tests — One Test, Many Cases
 
 ```python
-app.dependency_overrides[get_db] = override_get_db
-...
-app.dependency_overrides.clear()   # ALWAYS clean up
+@pytest.mark.parametrize("password", ["short", "1234567", ""])
+def test_register_rejects_weak_passwords(client, password):
+    response = client.post("/register", json={
+        "email": "x@example.com", "password": password, "confirm_password": password,
+    })
+    assert response.status_code == 422
 ```
 
-The same trick replaces `get_current_user` to skip auth.
+`parametrize` runs the same test body once per input, reporting each as a separate pass/fail. It replaces copy-pasted near-identical tests, and makes boundary cases (empty string, exactly-at-limit, one-below-limit) cheap to add.
 
-### 3.6 Test database strategy
+## Factories — Generating Test Data
 
-| Option | Pros | Cons |
-|---|---|---|
-| **SQLite in-memory** (default below) | Fast, zero setup, fresh every test | Not MySQL: differences in types, collation, constraint behavior |
-| **Separate MySQL test DB** (`contactbook_test`) | Matches production | Slower, needs running server |
-
-Start with SQLite to learn the pattern. Later, point `TEST_DATABASE_URL` to a MySQL test database to catch dialect-specific bugs. **Never run tests against your real database** — tests create/drop tables.
-
----
-
-## 4. `tests/conftest.py` (core of the whole suite)
+When tests need many users, orders, or products with slightly different attributes, hand-writing each is tedious and noisy. A small factory function supplies sensible defaults and lets each test override only what it cares about:
 
 ```python
-import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
-
-from main import app
-from db.database import Base, get_db
-
-# In-memory SQLite. StaticPool keeps ONE connection so all sessions
-# see the same in-memory DB (otherwise each connection gets an empty DB).
-engine = create_engine(
-    "sqlite://",
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
-)
-TestingSessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
-
-
-@pytest.fixture
-def db():
-    """Fresh schema for every test -> full isolation."""
-    Base.metadata.create_all(bind=engine)
-    session = TestingSessionLocal()
-    try:
-        yield session
-    finally:
-        session.close()
-        Base.metadata.drop_all(bind=engine)
-
-
-@pytest.fixture
-def client(db):
-    """TestClient wired to the test DB."""
-    def override_get_db():
-        yield db
-
-    app.dependency_overrides[get_db] = override_get_db
-    yield TestClient(app)
-    app.dependency_overrides.clear()
-```
-
-> Use `TestClient(app)` **without** `with` unless you need startup/shutdown events. If your app calls `Base.metadata.create_all(engine)` on startup against MySQL, the `with` form would hit your real DB.
-
----
-
-## 5. Factory pattern for test data
-
-Avoid copy-pasting dicts. A factory builds valid data with sensible defaults; tests override only what matters.
-
-`tests/factories.py`:
-```python
-from itertools import count
-from models.contact import Contact   # adjust to your model path
-
-_seq = count(1)
-
-def contact_payload(**overrides) -> dict:
-    """Dict for POST/PUT bodies. Unique email each call."""
-    n = next(_seq)
-    data = {
-        "name": f"User {n}",
-        "email": f"user{n}@test.com",
-        "phone": "1234567890",
-        "city": "London",
+def make_user_payload(**overrides):
+    payload = {
+        "email": "user@example.com",
+        "password": "strongpass123",
+        "confirm_password": "strongpass123",
     }
-    data.update(overrides)
-    return data
+    payload.update(overrides)
+    return payload
 
-def create_contact(db, **overrides) -> Contact:
-    """Insert directly into DB (bypasses the API) for arrange-phase seeding."""
-    contact = Contact(**contact_payload(**overrides))
-    db.add(contact)
-    db.commit()
-    db.refresh(contact)
-    return contact
+def test_duplicate_email(client):
+    client.post("/register", json=make_user_payload())
+    response = client.post("/register", json=make_user_payload())
+    assert response.status_code == 400
+
+def test_admin_without_key(client):
+    response = client.post("/register", json=make_user_payload(role="Admin"))
+    assert response.status_code == 422
 ```
 
-Usage:
-```python
-from tests.factories import contact_payload, create_contact
+Each test now states only what makes it *different* from the baseline, which makes the intent obvious at a glance.
 
-def test_search_by_city(client, db):
-    create_contact(db, name="Alice", city="London")
-    create_contact(db, name="Bob", city="Paris")
+## Mocking External Dependencies
 
-    r = client.get("/contacts/search", params={"q": "london"})
-
-    assert r.status_code == 200
-    assert [c["name"] for c in r.json()] == ["Alice"]
-```
-
-> Seed via `db` (fast, independent of the POST route). Use the API for seeding only when testing that flow.
-
----
-
-## 6. Example tests (from the roadmap, completed)
+Routes that call third-party services (weather APIs, payment gateways, email providers) must not hit the real service during tests — it makes tests slow, flaky, dependent on the network, and sometimes costly. Two common approaches:
 
 ```python
-# tests/test_contacts.py
-from tests.factories import contact_payload, create_contact
+# 1. Override the dependency that provides the HTTP client
+def override_http_client():
+    return FakeHttpClient(canned_response={"temp_C": "20"})
 
-
-def test_create_contact(client, db):
-    r = client.post("/contacts", json=contact_payload(name="Alice", email="alice@test.com"))
-    assert r.status_code == 201
-    body = r.json()
-    assert body["name"] == "Alice"
-    assert "id" in body
-
-
-def test_get_nonexistent_contact(client):
-    assert client.get("/contacts/9999").status_code == 404
-
-
-def test_duplicate_email_rejected(client, db):
-    client.post("/contacts", json=contact_payload(email="bob@test.com"))
-    r = client.post("/contacts", json=contact_payload(email="bob@test.com"))
-    assert r.status_code in (400, 409, 422)   # pin to your app's real choice
-
-
-def test_invalid_email_rejected(client):
-    r = client.post("/contacts", json=contact_payload(email="not-an-email"))
-    assert r.status_code == 422               # Pydantic validation
-
-
-def test_pagination(client, db):
-    for _ in range(5):
-        create_contact(db)
-    r = client.get("/contacts", params={"skip": 2, "limit": 2})
-    assert len(r.json()) == 2
-```
-
-**Parametrize** to avoid repetition:
-```python
-import pytest
-
-@pytest.mark.parametrize("bad", [
-    {"name": ""},                       # empty name
-    {"email": "nope"},                  # bad email
-    {"name": "x" * 101},                # over max length
-])
-def test_create_invalid(client, bad):
-    r = client.post("/contacts", json=contact_payload(**bad))
-    assert r.status_code == 422
-```
-
----
-
-## 7. Testing auth-protected routes (Phase 6)
-
-Two approaches — know both.
-
-### A. Real tokens (tests the whole auth chain) — preferred for a few core tests
-```python
-# tests/conftest.py (append)
-from auth.security import create_access_token, hash_password   # adjust to your code
-from models.user import User
-
-@pytest.fixture
-def make_user(db):
-    def _make(username="alice", password="secret123", role="user"):
-        user = User(username=username, hashed_password=hash_password(password), role=role)
-        db.add(user); db.commit(); db.refresh(user)
-        return user
-    return _make
-
-@pytest.fixture
-def auth_headers(make_user):
-    user = make_user()
-    token = create_access_token({"sub": user.username})
-    return {"Authorization": f"Bearer {token}"}
-
-@pytest.fixture
-def admin_headers(make_user):
-    admin = make_user(username="admin", role="admin")
-    token = create_access_token({"sub": admin.username})
-    return {"Authorization": f"Bearer {token}"}
+app.dependency_overrides[get_http_client] = override_http_client
 ```
 
 ```python
-# tests/test_auth.py
-def test_protected_route_without_token(client):
-    assert client.delete("/contacts/1").status_code == 401
+# 2. unittest.mock.patch on the function that makes the call
+from unittest.mock import patch, AsyncMock
 
-def test_protected_route_with_token(client, db, auth_headers):
-    c = create_contact(db)
-    assert client.delete(f"/contacts/{c.id}", headers=auth_headers).status_code in (200, 204)
-
-def test_invalid_token_rejected(client):
-    r = client.get("/me", headers={"Authorization": "Bearer garbage"})
-    assert r.status_code == 401
-
-# tests/test_admin.py
-def test_admin_route_forbidden_for_normal_user(client, auth_headers):
-    assert client.get("/admin/users", headers=auth_headers).status_code == 403
-
-def test_admin_route_allowed_for_admin(client, admin_headers):
-    assert client.get("/admin/users", headers=admin_headers).status_code == 200
+def test_weather_route(client):
+    with patch("routers.weather.fetch_weather", new=AsyncMock(return_value={"temp_C": "20"})):
+        response = client.get("/weather/London")
+    assert response.json()["temp_C"] == "20"
 ```
 
-### B. Override the auth dependency (fast, skips token logic)
-```python
-from auth.deps import get_current_user
+Overriding a dependency is cleaner when the application was already designed with the collaborator injected via `Depends()` — another practical payoff of the dependency-injection style used throughout this roadmap.
 
-def test_with_fake_user(client):
-    app.dependency_overrides[get_current_user] = lambda: FakeUser(role="admin")
-    ...
-    app.dependency_overrides.pop(get_current_user)   # or rely on client fixture cleanup
-```
+## Testing Other Phase Features
 
-> Use B for route logic tests, A for auth tests. Always test **both** the unauthenticated (401) and unauthorized (403) paths.
+- **Middleware** — tested implicitly through any request; assert on the headers it adds (`X-Request-ID`, `X-Process-Time`) or the early-rejection response it produces.
+- **Custom exception handlers** — trigger the condition and assert the handler's exact status code and body shape.
+- **Background tasks** — `TestClient` runs them to completion before returning, so their side effects (a log entry, a written file) can be asserted immediately after the request.
+- **File uploads** — `client.post("/upload", files={"file": ("test.png", file_bytes, "image/png")})`; test oversized files, wrong magic bytes, and path-traversal filenames explicitly.
+- **Lifespan** — use `with TestClient(app) as client:` so startup/shutdown actually run.
 
----
-
-## 8. Coverage
+## Coverage — Measuring What Tests Actually Touch
 
 ```bash
-pytest --cov=. --cov-report=term-missing           # shows uncovered line numbers
-pytest --cov=. --cov-report=html                   # open htmlcov/index.html
-pytest --cov=. --cov-fail-under=80                 # fail if below target
+pytest --cov=. --cov-report=term-missing
 ```
 
-`.coveragerc` (exclude noise):
+`pytest-cov` reports, per file, what percentage of lines executed during the test run, and with `term-missing` lists the exact line numbers that never ran. Those unexecuted lines are a to-do list of untested behavior — typically error branches and edge cases.
+
+```bash
+pytest --cov=. --cov-fail-under=80
+```
+
+`--cov-fail-under` makes the run fail if overall coverage drops below a threshold, which is how a coverage standard is enforced automatically in CI.
+
+Coverage has an important limit: it proves a line *ran*, not that anything meaningful was *asserted* about it. A test that calls a route and asserts nothing still produces coverage. High coverage is a necessary signal of thoroughness, never a sufficient one — assertion quality matters as much as the percentage.
+
+## Organizing a Test Suite
+
+```
+project/
+├── tests/
+│   ├── conftest.py          # shared fixtures: db_session, client, auth_headers
+│   ├── test_register.py
+│   ├── test_login.py
+│   ├── test_me.py
+│   └── test_admin.py
+├── pytest.ini               # test configuration
+```
+
+A typical `pytest.ini`:
+
 ```ini
-[run]
-omit =
-    tests/*
-    alembic/*
-    */__init__.py
+[pytest]
+testpaths = tests
+addopts = -v
 ```
 
-> **80% is a floor, not the goal.** Coverage shows what code *ran*, not whether assertions are meaningful. Read the `Missing` column and test the uncovered branches (error paths first).
+One test file per router or feature area keeps failures easy to locate. Test names should read as sentences describing behavior (`test_login_wrong_password`), so that a failing test name alone explains what broke.
+
+## Common Pitfalls
+
+- **Forgetting `with TestClient(app)`** when the app uses `lifespan` — resources never initialize.
+- **Leaking `dependency_overrides`** between tests — always clear them in fixture teardown.
+- **Tests that depend on execution order** — each test must set up everything it needs; relying on a previous test having created a user makes the suite fragile.
+- **Running tests against the development database** — a single missing environment flag can wipe real data. The `TESTING` environment variable set at the very top of `conftest.py`, before any app import, exists specifically to prevent this.
+- **Asserting only status codes** — a `200` with a wrong body is still a bug; assert on response content and, where relevant, on database state afterwards.
+- **Over-mocking** — mocking so much that a test only verifies the mocks proves nothing about real behavior. Mock external boundaries, not the code under test.
+- **Hardcoded secrets or expiry-dependent tokens** — tests relying on a fixed token that later expires fail mysteriously months afterward; generate tokens fresh inside fixtures.
+
+## Key Points to Retain
+
+- Automated tests re-prove behavior on every change; for APIs, they guard the contract with consumers and the correctness of authorization rules that manual checking easily misses.
+- `TestClient` covers most needs for synchronous apps; `httpx.AsyncClient` with `ASGITransport` is used when the test itself must be async. Use `with TestClient(app)` whenever lifespan matters.
+- Test isolation is the central design problem — separate test database plus per-test rollback is a robust, realistic combination.
+- Fixtures, `conftest.py`, and `parametrize` keep setup reusable and cases compact; factories keep test data readable by stating only what differs.
+- `dependency_overrides` is FastAPI's built-in seam for testing: override the database for integration-style tests, or the current-user dependency for isolated ones — and always clear overrides afterward.
+- Coverage measures execution, not verification; use `term-missing` to find untested branches, and treat the percentage as a floor rather than a goal.
 
 ---
 
-## 9. Best practices
+# Practice Exercises
 
-1. **Isolation:** each test gets a fresh DB; no test depends on another's data or order.
-2. **Assert more than status code:** also check body fields and, for writes, the DB state.
-3. **Test failure paths:** 404, 422, 401, 403, duplicates — these are where bugs live.
-4. **No real external calls:** mock email, payment, HTTP APIs (`unittest.mock.patch`, or override a dependency).
-5. **Keep tests fast:** whole suite should run in seconds.
-6. **Deterministic data:** no random values without a seed; no reliance on current time without freezing/overriding it.
-7. **Commit tests with the feature**, not afterwards.
-
----
-
-## 10. Workflow for the mini project
-
-1. Install tools, create `tests/` layout, write `conftest.py`, run one smoke test.
-2. Write CRUD tests (happy path) -> run `pytest`.
-3. Add failure/validation tests.
-4. Add search + pagination tests.
-5. Add auth + admin tests.
-6. Run `pytest --cov=. --cov-report=term-missing`, fill gaps until 80%+.
-7. Verify freshness: run the suite twice — results must be identical.
-
-Track progress in [`TEST_PLAN.md`](TEST_PLAN.md).
-
----
-
-## 11. Assumptions in this guide (adjust to your code)
-
-- Flat layout with `main.py`, `db/database.py` exposing `Base` and `get_db`.
-- Sync SQLAlchemy sessions (`pymysql`). If you used the async engine (`aiomysql`), tests need an async engine, `AsyncSession`, and `AsyncClient`.
-- Import paths (`models.contact`, `auth.security`, `auth.deps`) are placeholders.
-- Auth route names (`/me`, `/admin/users`) are examples.
+1. **Parametrize a validator** — convert the weak-password test in `test_register.py` into one `parametrize`d test with at least five boundary cases (empty, 1 char, 7 chars, exactly 8, whitespace-only).
+2. **Negative-path auth tests** — add tests for an expired token, a refresh token used as an access token, and a malformed `Authorization` header, asserting `401` for each.
+3. **Assert the 401-before-403 ordering** — write a test showing a garbage token on an admin route returns `401`, while a valid non-admin token returns `403`.
+4. **Add a factory** — introduce `make_user_payload(**overrides)` and refactor the registration tests to use it.
+5. **Isolated route test** — test `GET /me` by overriding `get_current_user` with a fake user, with no database fixture involved, and compare its speed and setup against the integration-style version.
+6. **Measure coverage** — run `pytest --cov=. --cov-report=term-missing`, pick the file with the lowest coverage, and write tests for its missing lines.
+7. **Mock an external call** — take the Weather Aggregator project, mock `fetch_weather` so the tests never touch the network, and assert the partial-failure behavior with one city made to fail.
